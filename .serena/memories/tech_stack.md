@@ -1,40 +1,52 @@
-# Technology Stack
+# Technology Stack and Dependencies
 
-## Programming Language
-- **Python** - Primary language for all development
+## Core Scientific Computing
+- **numpy** (>=1.21.0) - Numerical computing foundation
+- **pandas** (>=1.3.0) - Data manipulation and analysis
+- **scipy** (>=1.7.0) - Scientific computing algorithms
 
-## Core Data Analysis Libraries
-- **pandas** - Data manipulation and analysis
-- **numpy** - Numerical computing
-- **scipy** - Statistical analysis and scientific computing
-- **statsmodels** - Statistical modeling and econometrics
-- **scikit-learn** - Machine learning (supplementary)
+## Statistical Analysis
+- **statsmodels** (>=0.12.0) - Statistical modeling and econometrics
+- **scikit-learn** (>=1.0.0) - Machine learning algorithms
 
-## Financial Analysis Libraries  
-- **QuantLib** - Options pricing and derivatives
-- **yfinance** - Market data collection (if needed)
+## Quantitative Finance
+- **quantlib** (>=1.26) - Options pricing and derivatives (optional, can be challenging to install)
+- Custom implementations available as alternatives
 
-## Visualization Libraries
-- **matplotlib** - Basic plotting
-- **seaborn** - Statistical visualization
-- **plotly** - Interactive charts and dashboards
+## Data Visualization  
+- **matplotlib** (>=3.4.0) - Basic plotting
+- **seaborn** (>=0.11.0) - Statistical visualization
+- **plotly** (>=5.0.0) - Interactive charts
 
-## Database and Storage
-- **PostgreSQL** - Primary database for historical data storage
-- **SQLAlchemy** - Database ORM
-- **Redis** - Caching (for optimization)
+## Data Sources & APIs
+- **aiohttp** (>=3.8.0) - Async HTTP client
+- **requests** (>=2.25.0) - HTTP library
+- **yfinance** (optional) - Yahoo Finance API
+- **alpha-vantage** (optional) - Financial data API
+- **quandl** (optional) - Economic data API
 
-## Data Sources Integration
-- Nikkei official data feeds (API-based)
-- Investing.com historical data
-- Japan Exchange Group (JPX) official sources
+## Database & Storage
+- **sqlalchemy** (>=1.4.0) - Database ORM
+- **openpyxl** (>=3.0.0) - Excel file support
+- **xlsxwriter** (>=3.0.0) - Excel writing
+- Current: SQLite database (nikkei_data.db)
 
-## Development Environment
-- Linux-based development
-- MCP (Model Context Protocol) integration via Serena
-- Git version control (not yet initialized)
+## Development & Testing
+- **pytest** (>=6.0.0) - Testing framework
+- **pytest-asyncio** (>=0.15.0) - Async testing
+- **pytest-cov** (>=2.12.0) - Coverage reporting
+- **black** (>=21.0.0) - Code formatting
+- **flake8** (>=3.9.0) - Linting
+- **mypy** (>=0.910) - Type checking
 
-## Project Structure
-- No package management files yet (requirements.txt, pyproject.toml)
-- Directory structure prepared: data/scrape/, data/processed/, specs/
-- Specialized AI agent available: nikkei-seasonality-analyst
+## Utilities
+- **python-dotenv** (>=0.19.0) - Environment management
+- **structlog** (>=21.1.0) - Structured logging
+- **tqdm** (>=4.62.0) - Progress bars
+- **pytz** (>=2021.1) - Timezone handling
+- **numba** (>=0.54.0) - JIT compilation (optional)
+- **cython** (>=0.29.0) - C extensions (optional)
+
+## Jupyter Support
+- **jupyter** (>=1.0.0) - Notebook environment
+- **ipykernel** (>=6.0.0) - Python kernel

@@ -1,110 +1,65 @@
-# Coding Standards and Conventions
+# Coding Standards and Best Practices
 
-## Code Style Guidelines
+## Code Style
+- **Black** formatting with default settings (88 character line length)
+- **flake8** linting for code quality
+- **mypy** type checking for type safety
+- PEP 8 compliance required
 
-### Python Style Standards
-- **PEP 8** compliance for all Python code
-- **Black** for automated code formatting
-- **Maximum line length**: 88 characters (Black default)
-- **Import organization**: Use isort for consistent import ordering
+## Python Conventions
+- Use type hints for all function parameters and return types
+- Docstrings required for all public functions/classes (Google style preferred)
+- Use descriptive variable and function names
+- Prefer composition over inheritance
+- Follow SOLID principles
 
-### Naming Conventions
-- **Classes**: PascalCase (e.g., `SeasonalityAnalyzer`, `OptionsCalculator`)
-- **Functions/Methods**: snake_case (e.g., `test_monthly_patterns`, `calculate_greeks`)
-- **Variables**: snake_case (e.g., `monthly_returns`, `significance_level`)
-- **Constants**: UPPER_SNAKE_CASE (e.g., `SIGNIFICANCE_LEVEL`, `DATA_SOURCES`)
-- **Private methods**: Leading underscore (e.g., `_calculate_payoff`)
+## Financial Code Specific Standards
 
-### Type Hints
-- **Mandatory** for all function signatures
-- Use `from typing import Dict, List, Any, Optional` as needed
-- Example:
-```python
-def analyze_seasonality(data: pd.DataFrame, 
-                       significance: float = 0.05) -> Dict[str, Any]:
-```
+### Data Handling
+- Always validate financial data inputs
+- Handle missing data explicitly (NaN, holidays, weekends)
+- Use timezone-aware datetime objects for Japanese market data (JST/Asia/Tokyo)
+- Document data sources and assumptions clearly
 
-### Docstrings
-- **Google style** docstrings for all classes and functions
-- Include parameter types, return types, and examples for complex functions
-- Example:
-```python
-def calculate_black_scholes(S: float, K: float, T: float, r: float, sigma: float) -> float:
-    """Calculate Black-Scholes option price.
-    
-    Args:
-        S: Current stock price
-        K: Strike price  
-        T: Time to expiration (years)
-        r: Risk-free rate
-        sigma: Volatility
-        
-    Returns:
-        Option price as float
-        
-    Example:
-        >>> calculate_black_scholes(100, 105, 0.25, 0.05, 0.2)
-        2.13
-    """
-```
+### Statistical Analysis
+- Include confidence intervals and significance tests
+- Document statistical assumptions and limitations  
+- Use proper sampling techniques for backtesting
+- Avoid look-ahead bias in historical analysis
 
-### Error Handling
-- Use specific exception types rather than generic `Exception`
-- Implement custom exceptions for domain-specific errors:
-```python
-class DataValidationError(Exception):
-    """Raised when data quality checks fail"""
-    
-class InsufficientDataError(Exception):
-    """Raised when insufficient data for statistical analysis"""
-```
+### Options Pricing
+- Validate inputs (strikes, expiries, volatilities)
+- Handle edge cases (zero time to expiry, extreme volatilities)
+- Document pricing model assumptions
+- Include risk metrics (Greeks) alongside prices
 
-### Logging Standards
-- Use Python's `logging` module, not print statements
-- Configure appropriate log levels (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-- Include contextual information in log messages
-- Example:
-```python
-import logging
-logger = logging.getLogger(__name__)
-logger.info(f"Analyzing seasonality for {len(data)} observations")
-```
+### Risk Management
+- Set explicit risk limits and validation
+- Use Monte Carlo methods with proper random seed handling
+- Document risk model assumptions and limitations
+- Include stress testing scenarios
 
-## Financial Analysis Standards
-
-### Statistical Rigor
-- Always include confidence intervals and p-values
-- Use proper multiple comparison corrections (Bonferroni, FDR)
-- Document assumptions and limitations of statistical tests
-- Validate results with out-of-sample testing
-
-### Data Validation
-- Implement comprehensive data quality checks
-- Handle missing values explicitly (never ignore silently)
-- Cross-validate data from multiple sources
-- Maintain audit trails for all data transformations
-
-### Performance Requirements
-- Optimize for large datasets (20+ years of daily data)
-- Use vectorized operations (pandas/numpy) over loops
-- Implement chunked processing for memory management
-- Cache expensive calculations appropriately
-
-## Project Structure
-```
-src/
-├── data/           # Data collection and processing
-├── analysis/       # Statistical analysis modules  
-├── strategies/     # Options strategy implementation
-├── risk/          # Risk management and Monte Carlo
-├── visualization/ # Charting and reporting
-├── utils/         # Utility functions
-└── config/        # Configuration management
-```
+## Project Structure Standards
+- Modular design with clear separation of concerns
+- Each module should have a single responsibility
+- Use dependency injection for external services
+- Comprehensive error handling and logging
 
 ## Testing Standards
-- **Minimum 80% code coverage**
-- Unit tests for all statistical functions
+- Unit tests for all business logic
 - Integration tests for data pipelines
-- Mock external data sources in tests
 - Property-based testing for mathematical functions
+- Mock external data sources in tests
+- Aim for >90% test coverage
+
+## Documentation Standards
+- README files for each major component
+- Inline comments for complex financial logic
+- Jupyter notebooks for analysis demonstrations
+- API documentation for public interfaces
+
+## Japanese Market Considerations
+- Account for Japanese fiscal year (April 1 - March 31)
+- Handle Japanese market holidays correctly
+- Consider time zone differences in data processing
+- Document market-specific institutional factors

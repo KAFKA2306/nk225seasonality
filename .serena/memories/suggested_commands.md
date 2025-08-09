@@ -1,63 +1,86 @@
-# Suggested Commands for Development
+# Suggested Commands and Development Workflow
 
-## Current Project State
-⚠️ **Note**: This project is in early stage with no source code yet. These commands will be relevant once implementation begins.
-
-## Essential Development Commands
-
-### Project Initialization
+## Testing Commands
 ```bash
-git init                          # Initialize git repository
-python -m venv venv              # Create virtual environment  
-source venv/bin/activate         # Activate virtual environment (Linux)
+# Run all tests
+pytest
+
+# Run tests with coverage
+pytest --cov=src
+
+# Run specific test files
+pytest tests/test_seasonality.py
+pytest tests/test_options.py
+pytest tests/test_data_ingestion.py
 ```
 
-### Package Management
+## Code Quality Commands
 ```bash
-pip install -r requirements.txt  # Install dependencies (once created)
-pip freeze > requirements.txt    # Save current dependencies
-pip install -e .                # Install project in development mode
+# Format code
+black src/ tests/
+
+# Lint code
+flake8 src/ tests/
+
+# Type checking
+mypy src/
 ```
 
-### Code Quality (once established)
+## Development Commands
 ```bash
-black .                         # Code formatting
-flake8 .                       # Linting  
-mypy src/                      # Type checking
-pytest                         # Run tests
-pytest --cov=src/             # Run tests with coverage
+# Install dependencies
+pip install -r requirements.txt
+
+# Run main analysis pipeline
+python main.py
+
+# Start Jupyter notebook for analysis
+jupyter notebook
+
+# Run specific analysis modules
+python -m src.analysis.seasonality
+python -m src.options.strategies
+python -m src.risk.monte_carlo
 ```
 
-### Data Operations (to be implemented)
+## Data Management Commands
 ```bash
-python -m src.data.collect     # Collect historical data
-python -m src.analysis.main    # Run seasonality analysis
-python -m src.strategies.backtest  # Backtest strategies
+# Run data ingestion
+python -m src.data.ingestion
+
+# Validate data quality
+python -m src.data.validation
+
+# Check database schema
+python -c "from src.data.repository import get_engine; print(get_engine().table_names())"
 ```
 
-### System Utilities (Linux)
+## Logging and Monitoring
 ```bash
-ls -la                         # List files with details
-find . -name "*.py"           # Find Python files
-grep -r "pattern" src/        # Search in source code
-du -sh data/                  # Check data directory size
+# View recent logs
+tail -f logs/nikkei_analysis.log
+tail -f logs/errors.log
+
+# Clear logs
+rm logs/*.log
 ```
 
-## Analysis Pipeline Commands (future)
+## Analysis Commands
 ```bash
-# Statistical analysis workflow
-python analyze_seasonality.py --period 20y --significance 0.05
-python generate_strategies.py --month 3 --strategy put_spread  
-python backtest_portfolio.py --start 2000 --end 2023
+# Run seasonality analysis
+python -m src.analysis.seasonality
+
+# Generate visualizations
+python -m src.visualization.seasonality_viz
+
+# Calculate option strategies
+python -m src.options.strategies
+
+# Run risk analysis
+python -m src.risk.monte_carlo
 ```
 
-## Docker Commands (if containerized)
-```bash
-docker build -t nikkei-analysis .
-docker run -v $(pwd)/data:/app/data nikkei-analysis
-```
-
-## Notes
-- Use the `nikkei-seasonality-analyst` agent for complex statistical analysis tasks
-- All financial analysis should maintain academic rigor with proper statistical testing
-- Data validation is critical given the requirements for 99.9% accuracy
+## Database Operations
+- Database file: `data/nikkei_data.db`
+- Schema managed via SQLAlchemy
+- Backup: `cp data/nikkei_data.db data/nikkei_data_backup.db`

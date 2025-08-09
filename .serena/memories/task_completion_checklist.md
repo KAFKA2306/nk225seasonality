@@ -1,79 +1,94 @@
 # Task Completion Checklist
 
-## Code Quality Checks
+## Pre-Implementation Checklist
+- [ ] Understand the specific requirements clearly
+- [ ] Review relevant project memories and documentation
+- [ ] Check if nikkei-seasonality-analyst agent should be used
+- [ ] Identify affected modules and dependencies
+- [ ] Plan the implementation approach
 
-### Pre-Commit Requirements
-- [ ] **Code Formatting**: Run `black .` to ensure consistent formatting
-- [ ] **Linting**: Run `flake8 .` and resolve all issues
-- [ ] **Type Checking**: Run `mypy src/` and fix type errors  
-- [ ] **Import Organization**: Run `isort .` for consistent imports
+## During Implementation Checklist
 
-### Testing Requirements
-- [ ] **Unit Tests**: Write tests for new functions/classes
-- [ ] **Test Coverage**: Ensure coverage remains above 80%
-- [ ] **Integration Tests**: Test data pipeline end-to-end
-- [ ] **Statistical Validation**: Verify statistical test results
+### Code Quality
+- [ ] Follow established coding standards
+- [ ] Add appropriate type hints
+- [ ] Write descriptive docstrings
+- [ ] Include error handling
+- [ ] Add logging statements where appropriate
+- [ ] Handle Japanese market specifics correctly
+
+### Financial Code Specific
+- [ ] Validate all financial data inputs
+- [ ] Handle missing data and edge cases
+- [ ] Use timezone-aware datetime objects (JST)
+- [ ] Document assumptions and limitations
+- [ ] Include confidence intervals for statistics
+- [ ] Avoid look-ahead bias in analysis
+
+### Testing
+- [ ] Write unit tests for new functionality
+- [ ] Test edge cases and error conditions
+- [ ] Mock external dependencies
+- [ ] Run existing tests to ensure no regressions
+- [ ] Achieve adequate test coverage
+
+## Post-Implementation Checklist
+
+### Code Quality Validation
+- [ ] Run `black src/ tests/` for formatting
+- [ ] Run `flake8 src/ tests/` for linting
+- [ ] Run `mypy src/` for type checking
+- [ ] All code quality checks pass
+
+### Testing Validation
+- [ ] Run `pytest` - all tests pass
+- [ ] Run `pytest --cov=src` - coverage adequate
+- [ ] Manual testing of new functionality
+- [ ] Integration testing if applicable
 
 ### Documentation
-- [ ] **Docstrings**: Add Google-style docstrings to new functions
-- [ ] **Type Hints**: Include type annotations for all parameters/returns
-- [ ] **Comments**: Add inline comments for complex logic
-- [ ] **README Updates**: Update documentation if needed
+- [ ] Update relevant docstrings
+- [ ] Update README if public API changed
+- [ ] Update specs/ if requirements changed
+- [ ] Add usage examples if needed
 
-## Financial Analysis Validation
+### Final Verification
+- [ ] Code follows project architecture patterns
+- [ ] No sensitive data or credentials in code
+- [ ] Logging is appropriate and structured
+- [ ] Performance considerations addressed
+- [ ] Japanese market specifics handled correctly
 
-### Statistical Rigor
-- [ ] **Significance Testing**: Include p-values and confidence intervals
-- [ ] **Multiple Comparisons**: Apply appropriate corrections
-- [ ] **Assumption Checking**: Validate statistical test assumptions
-- [ ] **Out-of-Sample Testing**: Validate results on holdout data
+## Specialized Tasks Checklist
 
-### Data Quality
-- [ ] **Data Validation**: Run comprehensive quality checks
-- [ ] **Missing Data**: Handle gaps appropriately 
-- [ ] **Cross-Validation**: Compare results across data sources
-- [ ] **Audit Trail**: Document all data transformations
+### Statistical Analysis Tasks
+- [ ] Use nikkei-seasonality-analyst agent
+- [ ] Include significance testing
+- [ ] Document statistical assumptions
+- [ ] Provide confidence intervals
+- [ ] Validate sample sizes
+- [ ] Check for multiple comparisons issues
 
-### Risk Management
-- [ ] **Monte Carlo**: Run sufficient simulations (≥10,000)
-- [ ] **VaR/ES Calculation**: Include proper risk metrics
-- [ ] **Sensitivity Analysis**: Test across market scenarios
-- [ ] **Transaction Costs**: Include realistic cost assumptions
+### Options Strategy Tasks  
+- [ ] Use nikkei-seasonality-analyst agent
+- [ ] Validate pricing inputs
+- [ ] Calculate Greeks
+- [ ] Include risk metrics
+- [ ] Document strategy assumptions
+- [ ] Provide backtesting results
 
-## Performance Verification
-- [ ] **Memory Usage**: Check for memory leaks in long-running processes
-- [ ] **Execution Time**: Ensure analysis completes within 2 hours
-- [ ] **Scalability**: Test with full 20-year dataset
-- [ ] **Caching**: Implement caching for expensive operations
+### Data Processing Tasks
+- [ ] Handle Japanese market holidays
+- [ ] Validate data quality
+- [ ] Handle missing data appropriately
+- [ ] Use proper timezone handling
+- [ ] Document data sources
+- [ ] Include data lineage information
 
-## Final Checks
-- [ ] **Reproducibility**: Ensure results are reproducible with random seeds
-- [ ] **Version Control**: Commit changes with descriptive messages
-- [ ] **Configuration**: Update config files if parameters changed
-- [ ] **Specialized Agent**: Use nikkei-seasonality-analyst for complex analysis
-
-## Command Execution Order
-```bash
-# 1. Code quality
-black .
-flake8 .  
-mypy src/
-isort .
-
-# 2. Testing
-pytest --cov=src/
-
-# 3. Analysis validation (when applicable)
-python -m src.analysis.validate_results
-
-# 4. Final verification
-python -m src.pipeline.run_full_analysis
-```
-
-## Success Criteria
-- All tests pass
-- No linting errors
-- Statistical significance properly documented
-- Risk metrics calculated correctly
-- Analysis completes within performance requirements
-- Results are reproducible and well-documented
+## Deployment Checklist
+- [ ] All tests passing in clean environment
+- [ ] Dependencies properly specified
+- [ ] Configuration properly externalized
+- [ ] Logging configured correctly
+- [ ] Error monitoring in place
+- [ ] Performance benchmarks established

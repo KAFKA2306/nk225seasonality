@@ -1,78 +1,86 @@
-# Development Workflow and Commands
+# Development Workflow and Best Practices
 
-## Project Status
-- **Current State**: Early stage - no source code yet, only specifications
-- **Package Management**: Not yet established (no requirements.txt, pyproject.toml, or setup.py)
-- **Git Repository**: Not yet initialized
-- **Testing Framework**: Not yet established
+## Git Workflow
+- **Main branch**: `main` (current branch)
+- Feature branches for new functionality
+- Commit messages should be descriptive and reference issues
+- Use conventional commits format when possible
 
-## Recommended Development Setup Commands
+## Development Process
 
-### Initial Project Setup (when implementing)
-```bash
-# Initialize git repository
-git init
-git add .
-git commit -m "Initial project structure"
+### 1. Before Starting Work
+- Update from main branch
+- Create feature branch if needed
+- Review relevant specs in `specs/` directory
+- Check current project memories and documentation
 
-# Create Python package management
-# Option 1: requirements.txt approach
-touch requirements.txt
+### 2. Development Cycle
+- Write failing tests first (TDD approach)
+- Implement functionality
+- Run code quality checks (`black`, `flake8`, `mypy`)
+- Run tests (`pytest`)
+- Update documentation if needed
 
-# Option 2: Modern pyproject.toml approach
-touch pyproject.toml
-```
+### 3. Specialized Agent Usage
+**Always use the nikkei-seasonality-analyst agent for:**
+- Statistical analysis tasks
+- Market data analysis
+- Options strategy development
+- Risk management implementations
+- Japanese market specific considerations
 
-### Package Management (to be established)
-```bash
-# Install dependencies (when requirements.txt exists)
-pip install -r requirements.txt
+### 4. Code Review Checklist
+- [ ] All tests passing
+- [ ] Code formatted with black
+- [ ] No linting errors
+- [ ] Type hints added
+- [ ] Docstrings updated
+- [ ] Log statements appropriate
+- [ ] Error handling implemented
+- [ ] Japanese market specifics considered
 
-# Or with pyproject.toml
-pip install -e .
-```
+## Project Architecture
 
-### Testing Commands (to be established)
-```bash
-# Run tests (framework TBD - pytest recommended)
-pytest
+### Core Modules
+- **data/**: Data ingestion, validation, repository pattern
+- **analysis/**: Seasonality analysis, market mechanisms
+- **options/**: Pricing calculations, strategy implementations
+- **risk/**: VaR calculations, Monte Carlo simulations
+- **visualization/**: Charts and analysis outputs
+- **utils/**: Common utilities and helpers
 
-# With coverage
-pytest --cov=src/
+### Key Design Patterns
+- Repository pattern for data access
+- Strategy pattern for options strategies
+- Pipeline pattern for analysis workflows
+- Observer pattern for logging and monitoring
 
-# Specific test modules
-pytest tests/test_seasonality.py
-```
+## Data Flow
+1. **Ingestion**: Raw data → Database (SQLite)
+2. **Validation**: Quality checks and cleaning
+3. **Analysis**: Statistical analysis and pattern detection
+4. **Strategy**: Options strategy development
+5. **Risk**: Risk assessment and backtesting
+6. **Visualization**: Results presentation
 
-### Code Quality Commands (to be established)
-```bash
-# Code formatting
-black src/ tests/
+## Environment Management
+- Use `.env` files for configuration (not committed)
+- Database: `data/nikkei_data.db`
+- Logs: `logs/` directory
+- Outputs: `outputs/` directory
+- Notebooks: `notebooks/` directory for exploration
 
-# Linting
-flake8 src/ tests/
-# Or
-pylint src/ tests/
+## Academic Rigor Requirements
+- Proper statistical significance testing
+- Validation of assumptions
+- Out-of-sample testing
+- Documentation of methodology
+- Reproducible analysis pipelines
+- Citation of relevant literature
 
-# Type checking
-mypy src/
-
-# Import sorting
-isort src/ tests/
-```
-
-### Data Pipeline Commands (to be implemented)
-```bash
-# Data collection
-python -m src.data.collect_nikkei_data
-
-# Statistical analysis
-python -m src.analysis.seasonality_analyzer
-
-# Strategy backtesting  
-python -m src.strategies.backtest_options
-```
-
-## Specialized Agent Usage
-- Use `nikkei-seasonality-analyst` agent for statistical analysis and options strategy development
-- This agent has specialized knowledge of Japanese market patterns and quantitative finance
+## Japanese Market Considerations
+- Trading hours: 9:00-11:30, 12:30-15:00 JST
+- Fiscal year-end effects (March 31)
+- Golden Week and other holidays
+- Institutional investment patterns
+- Currency hedging considerations
