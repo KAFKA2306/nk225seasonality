@@ -33,6 +33,44 @@ This system provides sophisticated statistical analysis of Japanese equity marke
 - **Quality Validation**: 15+ validation rules with anomaly detection
 - **Professional Charts**: Publication-quality seasonality heatmaps, payoff diagrams, risk dashboards
 
+### Fundamental Metrics
+
+Historical price-to-earnings (PER) and derived earnings-per-share (EPS) data for the Nikkei 225 over the last three years:
+
+#### PER (last 3 years)
+
+```
+   17.62  ┤
+   17.10  ┤                                   ╭
+   16.59  ┤                  ╭─╮╭╮            │
+   16.07  ┤                 ╭╯ ╰╯╰╮          ╭╯
+   15.56  ┤                ╭╯     ╰╮╭╮╭─╮  ╭─╯
+   15.04  ┤         ╭───╮  │       ╰╯╰╯ │  │
+   14.53  ┤         │   ╰──╯            ╰──╯
+   14.01  ┤        ╭╯
+   13.50  ┤       ╭╯
+   12.98  ┼╮╭─╮╭──╯
+   12.47  ┤││ ││
+   11.95  ┤╰╯ ╰╯
+```
+
+#### EPS (last 3 years)
+
+```
+ 2538.39  ┤
+ 2496.04  ┤                             ╭╮  ╭╮
+ 2453.68  ┤                        ╭────╯│  │╰╮
+ 2411.32  ┤                       ╭╯     ╰──╯ ╰
+ 2368.96  ┤                 ╭─╮ ╭─╯
+ 2326.60  ┤                 │ │╭╯
+ 2284.25  ┤               ╭─╯ ││
+ 2241.89  ┤              ╭╯   ╰╯
+ 2199.53  ┼─╮╭╮    ╭─╮   │
+ 2157.17  ┤ ╰╯╰─╮  │ ╰─╮ │
+ 2114.81  ┤     ╰──╯   ╰╮│
+ 2072.45  ┤             ╰╯
+```
+
 ## Quick Start
 
 ### Installation
