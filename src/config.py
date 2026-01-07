@@ -41,6 +41,23 @@ class ValuationConfig:
     jgb_yield: float
     risk_premium: float
     years_for_analysis: int
+    historical_eps: Dict[int, float] = None
+
+    def __post_init__(self):
+        if self.historical_eps is None:
+            # Approximate Historical EPS for Nikkei 225 (Destructive Improvement)
+            # Source: Approximate weighted average based on publicly available historical data
+            self.historical_eps = {
+                2014: 1050, 2015: 1200, 2016: 1180, 2017: 1400,
+                2018: 1700, 2019: 1650, 2020: 1600, 2021: 2000,
+                2022: 2150, 2023: 2250, 2024: 2400, 2025: 2500,
+                2026: 2550 # Forecast
+            }
+    
+    def get_eps_for_date(self, date_obj: Any) -> float:
+        """Returns EPS for a given year, falling back to assumed_eps."""
+        year = date_obj.year
+        return self.historical_eps.get(year, self.assumed_eps)
 
 
 @dataclass

@@ -49,13 +49,20 @@ class AnalysisPipeline:
             
         # --- Value Analysis Injection (Destructive Improvement) ---
         # NOTE: Ideally this comes from a DataProvider, but for "Destructive Speed" we inject here to enable the chart.
+        # --- Value Analysis Injection (Destructive Improvement) ---
+        # NOTE: Ideally this comes from a DataProvider, but for "Destructive Speed" we inject here to enable the chart.
         # Assumptions used for valuation (from config)
-        eps_estimate = self.config.valuation.assumed_eps
         jgb_yield = self.config.valuation.jgb_yield
         risk_premium = self.config.valuation.risk_premium
         fair_per = 100 / (jgb_yield + risk_premium)
         
-        raw_data["per"] = raw_data["close_price"] / eps_estimate
+        # Dynamic EPS Calculation
+        val_config = self.config.valuation
+        
+        # Create a series of EPS values based on year
+        eps_series = raw_data.index.map(lambda d: val_config.get_eps_for_date(d))
+        
+        raw_data["per"] = raw_data["close_price"] / eps_series
         raw_data["fair_per"] = fair_per
         raw_data["divergence"] = (raw_data["per"] - fair_per) / fair_per * 100
         # -----------------------------------------------------------
@@ -95,18 +102,18 @@ class AnalysisPipeline:
 
         # Phase 3: Visualization (Seasonality)
         if save_results:
-            # Standard Heatmaps
-            self.seasonality_viz.create_seasonal_heatmap(
+            # Bar Charts (Replaces Heatmaps)
+            self.seasonality_viz.create_seasonal_bar_chart(
                 seasonality_results,
                 metric="mean_return",
-                title="Nikkei 225 Monthly Returns Seasonality",
-                save_path="seasonality/heatmap_returns.png",
+                title="Nikkei 225 Monthly Mean Returns",
+                save_path="seasonality/barchart_returns.png",
             )
-            self.seasonality_viz.create_seasonal_heatmap(
+            self.seasonality_viz.create_seasonal_bar_chart(
                 seasonality_results,
                 metric="t_pvalue",
-                title="Seasonality Significance (p-values)",
-                save_path="seasonality/heatmap_pvalues.png",
+                title="Statistical Significance (P-Values)",
+                save_path="seasonality/barchart_pvalues.png",
             )
             # Time Series
             self.seasonality_viz.create_seasonal_time_series(
@@ -130,8 +137,8 @@ class AnalysisPipeline:
             )
 
             pipeline_results["visualization"] = {
-                "seasonality_heatmap": "seasonality/heatmap_returns.png",
-                "significance_heatmap": "seasonality/heatmap_pvalues.png",
+                "seasonality_returns_chart": "seasonality/barchart_returns.png",
+                "seasonality_pvalues_chart": "seasonality/barchart_pvalues.png",
                 "timeseries_plot": "seasonality/timeseries_seasonality.png",
                 "boxplot_distribution": "seasonality/boxplot_distribution.png",
                 "heatmap_year_month": "seasonality/heatmap_year_month.png",

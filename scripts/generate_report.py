@@ -31,7 +31,10 @@ async def generate_report():
     valuation_rows = []
     # Reverse order for table (newest first)
     for date, row in df.iloc[::-1].iterrows():
-        per = row["Close"] / eps
+        # Dynamic EPS
+        current_eps = config.valuation.get_eps_for_date(date)
+        
+        per = row["Close"] / current_eps
         div = ((per - fair_per) / fair_per) * 100
         
         status = (
@@ -49,7 +52,9 @@ async def generate_report():
     
     # Current Stats
     cur = df.iloc[-1]
-    cur_per = cur["Close"] / eps
+    cur_date = cur.name
+    cur_eps = config.valuation.get_eps_for_date(cur_date)
+    cur_per = cur["Close"] / cur_eps
     cur_div = ((cur_per - fair_per) / fair_per) * 100
     
     # --- 2. New Seasonality Analysis ---
@@ -115,15 +120,15 @@ async def generate_report():
                 </p>
             </div>
 
-            <!-- 4. Aggregated Stats (Legacy + P-Values) -->
+            <!-- 4. Aggregated Stats (Bar Charts) -->
             <div class="grid-2">
                 <div class="chart-box">
-                    <h3>Mean Returns Heatmap</h3>
-                    <img src="{viz.get('seasonality_heatmap', '')}" alt="Returns Heatmap" loading="lazy">
+                    <h3>Mean Returns (Avg)</h3>
+                    <img src="{viz.get('seasonality_returns_chart', '')}" alt="Returns Bar Chart" loading="lazy">
                 </div>
                 <div class="chart-box">
                     <h3>Statistical Significance (P-Values)</h3>
-                    <img src="{viz.get('significance_heatmap', '')}" alt="Significance Heatmap" loading="lazy">
+                    <img src="{viz.get('seasonality_pvalues_chart', '')}" alt="Significance Chart" loading="lazy">
                 </div>
             </div>
 

@@ -405,6 +405,77 @@ class SeasonalityVisualizer:
             self._save_plot(fig, save_path)
         return fig
 
+    def create_seasonal_bar_chart(
+        self,
+        seasonality_results: Dict[int, Any],
+        metric: str = "mean_return",
+        title: Optional[str] = None,
+        save_path: Optional[str] = None,
+    ) -> plt.Figure:
+        """
+        Creates a publication-grade Bar Chart for seasonal metrics.
+        Replaces the hard-to-read 1D heatmap.
+        """
+        month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        months = range(1, 13)
+        values = []
+        colors = []
+        significance_markers = []
+        
+        for m in months:
+            result = seasonality_results.get(m)
+            if not result:
+                values.append(0)
+                colors.append(self.colors["secondary"])
+                significance_markers.append("")
+                continue
+                
+            if metric == "mean_return":
+                val = result.mean_return * 100
+                values.append(val)
+                colors.append(self.colors["success"] if val >= 0 else self.colors["danger"])
+                marker = "**" if result.is_significant and result.t_pvalue < 0.01 else "*" if result.is_significant else ""
+                significance_markers.append(marker)
+            elif metric == "t_pvalue":
+                val = result.t_pvalue
+                values.append(val)
+                # Highlights significant p-values
+                colors.append(self.colors["primary"] if val > 0.05 else self.colors["danger"]) 
+                significance_markers.append("")
+
+        fig, ax = plt.subplots(figsize=self.figsize)
+        
+        bars = ax.bar(month_names, values, color=colors, alpha=0.8, edgecolor="black", linewidth=0.5)
+        
+        # Annotations
+        if metric == "mean_return":
+            ax.axhline(0, color="black", linewidth=1)
+            ax.set_ylabel("Mean Return (%)")
+            # Add significance markers on top of bars
+            for bar, marker in zip(bars, significance_markers):
+                if marker:
+                    height = bar.get_height()
+                    offset = max(values) * 0.05 if height >= 0 else -max(abs(min(values)), 1) * 0.1
+                    ax.text(bar.get_x() + bar.get_width()/2., height + offset,
+                            marker, ha='center', va='bottom' if height >= 0 else 'top', 
+                            fontsize=14, fontweight='bold', color='black')
+                            
+        elif metric == "t_pvalue":
+            ax.axhline(0.05, color=self.colors["danger"], linestyle="--", linewidth=1.5, label="p=0.05")
+            ax.axhline(0.10, color=self.colors["warning"], linestyle=":", linewidth=1.5, label="p=0.10")
+            ax.set_ylabel("P-Value")
+            ax.legend(loc="upper right")
+            ax.set_ylim(0, max(max(values), 0.2)) # Ensure we see the small p-values structure
+
+        ax.set_title(title or self._get_metric_title(metric), fontsize=16, fontweight="bold", pad=20)
+        ax.grid(True, axis="y", alpha=0.3)
+        
+        plt.tight_layout()
+        if save_path:
+            self._save_plot(fig, save_path)
+            
+        return fig
+
     def _save_plot(self, fig: plt.Figure, save_path: str):
         path = self.output_dir / save_path if self.output_dir else Path(save_path)
         path.parent.mkdir(parents=True, exist_ok=True)
