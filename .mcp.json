@@ -2,16 +2,15 @@
   "mcpServers": {
     "serena": {
       "type": "stdio",
-      "command": "uvx",
+      "command": "wsl",
       "args": [
-        "--from",
-        "git+https://github.com/oraios/serena",
-        "serena",
-        "start-mcp-server",
-        "--context",
-        "ide-assistant",
-        "--project",
-        "/home/kafka/finance/nk225seasonality"
+        "-d",
+        "Ubuntu-22.04-LTS",
+        "-u",
+        "kafka",
+        "bash",
+        "-c",
+        "export PATH=$HOME/.local/bin:$PATH; serena start-mcp-server --context ide-assistant --project /home/kafka/finance/nk225seasonality"
       ],
       "env": {}
     }
