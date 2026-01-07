@@ -25,7 +25,11 @@ class AnalysisPipeline:
         self.risk_viz = RiskVisualizer(self.config.output_dir)
 
     async def run_full_analysis(
-        self, start_date: datetime, end_date: datetime, save_results: bool = True
+        self,
+        start_date: datetime,
+        end_date: datetime,
+        save_results: bool = True,
+        skip_storage: bool = False,
     ) -> Dict[str, Any]:
         pipeline_results = {
             "metadata": {
@@ -39,7 +43,25 @@ class AnalysisPipeline:
         # Phase 1: Data
         raw_data = await self.data_ingestion.collect_data(start_date, end_date)
         validation_results = self.data_validator.validate_dataset(raw_data)
-        self.data_repository.store_data(raw_data, "pipeline_analysis")
+        
+        if "returns" not in raw_data.columns:
+            raw_data["returns"] = raw_data.get("adjusted_close", raw_data["close_price"]).pct_change()
+            
+        # --- Value Analysis Injection (Destructive Improvement) ---
+        # NOTE: Ideally this comes from a DataProvider, but for "Destructive Speed" we inject here to enable the chart.
+        # Assumptions used for valuation (from config)
+        eps_estimate = self.config.valuation.assumed_eps
+        jgb_yield = self.config.valuation.jgb_yield
+        risk_premium = self.config.valuation.risk_premium
+        fair_per = 100 / (jgb_yield + risk_premium)
+        
+        raw_data["per"] = raw_data["close_price"] / eps_estimate
+        raw_data["fair_per"] = fair_per
+        raw_data["divergence"] = (raw_data["per"] - fair_per) / fair_per * 100
+        # -----------------------------------------------------------
+
+        if not skip_storage:
+            self.data_repository.store_data(raw_data, "pipeline_analysis")
 
         pipeline_results["data_phase"] = {
             "success": True,
@@ -70,6 +92,51 @@ class AnalysisPipeline:
             "mechanism_analysis": mechanism_results,
             "significant_months": [m for m, r in seasonality_results.items() if r.is_significant],
         }
+
+        # Phase 3: Visualization (Seasonality)
+        if save_results:
+            # Standard Heatmaps
+            self.seasonality_viz.create_seasonal_heatmap(
+                seasonality_results,
+                metric="mean_return",
+                title="Nikkei 225 Monthly Returns Seasonality",
+                save_path="seasonality/heatmap_returns.png",
+            )
+            self.seasonality_viz.create_seasonal_heatmap(
+                seasonality_results,
+                metric="t_pvalue",
+                title="Seasonality Significance (p-values)",
+                save_path="seasonality/heatmap_pvalues.png",
+            )
+            # Time Series
+            self.seasonality_viz.create_seasonal_time_series(
+                data,
+                highlight_months=[m for m, r in seasonality_results.items() if r.is_significant],
+                save_path="seasonality/timeseries_seasonality.png",
+            )
+            
+            # --- Publication Grade Visuals ---
+            self.seasonality_viz.create_monthly_distribution_boxplot(
+                data,
+                save_path="seasonality/boxplot_distribution.png"
+            )
+            self.seasonality_viz.create_year_month_heatmap(
+                data,
+                save_path="seasonality/heatmap_year_month.png"
+            )
+            self.seasonality_viz.create_valuation_chart(
+                data,
+                save_path="seasonality/valuation_timeseries.png"
+            )
+
+            pipeline_results["visualization"] = {
+                "seasonality_heatmap": "seasonality/heatmap_returns.png",
+                "significance_heatmap": "seasonality/heatmap_pvalues.png",
+                "timeseries_plot": "seasonality/timeseries_seasonality.png",
+                "boxplot_distribution": "seasonality/boxplot_distribution.png",
+                "heatmap_year_month": "seasonality/heatmap_year_month.png",
+                "valuation_timeseries": "seasonality/valuation_timeseries.png",
+            }
 
         # Phase 6: Summary
         pipeline_results["summary"] = {

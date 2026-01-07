@@ -36,6 +36,14 @@ class RiskConfig:
 
 
 @dataclass
+class ValuationConfig:
+    assumed_eps: float
+    jgb_yield: float
+    risk_premium: float
+    years_for_analysis: int
+
+
+@dataclass
 class DatabaseConfig:
     host: str
     port: int
@@ -59,6 +67,7 @@ class SystemConfig:
         self._setup_data_sources()
         self._setup_analysis_config()
         self._setup_risk_config()
+        self._setup_valuation_config()
         self._setup_database_config()
         self._setup_logging()
 
@@ -113,6 +122,14 @@ class SystemConfig:
             stress_test_scenarios=int(os.getenv("STRESS_TEST_SCENARIOS", "1000")),
         )
 
+    def _setup_valuation_config(self) -> None:
+        self.valuation = ValuationConfig(
+            assumed_eps=float(os.getenv("VALUATION_EPS", "2400")),
+            jgb_yield=float(os.getenv("VALUATION_JGB_YIELD", "3.5")),
+            risk_premium=float(os.getenv("VALUATION_RISK_PREMIUM", "3.5")),
+            years_for_analysis=int(os.getenv("VALUATION_YEARS", "5")),
+        )
+
     def _setup_database_config(self) -> None:
         self.database = DatabaseConfig(
             host=os.getenv("DB_HOST", "localhost"),
@@ -162,6 +179,11 @@ class SystemConfig:
             },
             "analysis": {"significance_level": self.analysis.significance_level},
             "risk": {"max_position_size": self.risk.max_position_size},
+            "valuation": {
+                "assumed_eps": self.valuation.assumed_eps,
+                "jgb_yield": self.valuation.jgb_yield,
+                "risk_premium": self.valuation.risk_premium,
+            },
             "database": {
                 "host": self.database.host,
                 "database": self.database.database,

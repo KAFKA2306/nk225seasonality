@@ -11,7 +11,7 @@ class MarketDataRepository:
     def __init__(self, config):
         self.config = config
         self.db_path = config.data_dir / "nikkei_data.db"
-        self._ensure_database_schema()
+        self._db_initialized = False
         self._cache = {}
         self._cache_ttl = 300
         self._cache_timestamps = {}
@@ -34,12 +34,17 @@ class MarketDataRepository:
         );
         CREATE INDEX IF NOT EXISTS idx_trade_date ON nikkei_daily_data(trade_date);
         """
-        with self._get_connection() as conn:
+        # Use direct connection to avoid recursion loop from _get_connection
+        with sqlite3.connect(self.db_path, timeout=30) as conn:
             conn.executescript(schema_sql)
             conn.commit()
 
     @contextmanager
     def _get_connection(self):
+        if not self._db_initialized:
+            self._ensure_database_schema()
+            self._db_initialized = True
+            
         conn = sqlite3.connect(self.db_path, timeout=30)
         conn.row_factory = sqlite3.Row
         yield conn
