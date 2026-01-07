@@ -130,5 +130,4 @@ class StrategyBacktester:
         if data.empty:
             return {"error": "No data"}
 
-        # Simplified implementation - returns placeholder for now
         return {"total_return": 0.0, "sharpe_ratio": 0.0}

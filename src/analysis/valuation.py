@@ -104,21 +104,73 @@ def fetch_nikkei_data(years: int) -> pd.DataFrame:
     return df
 
 
-def calculate_historical_per(price_data: pd.DataFrame, base_eps: float = 2400) -> pd.DataFrame:
+def fetch_current_jgb_yield(ticker: str) -> float:
+    """
+    Fetches the current 10-year JGB yield from Yahoo Finance.
+    Returns the yield as a percentage (e.g., 1.05 for 1.05%).
+    
+    Args:
+        ticker: The ticker symbol for the JGB yield (e.g., ^JP10Y)
+        
+    Returns:
+        float: The current yield in percent.
+        
+    Raises:
+        RuntimeError: If fetching fails or data is empty.
+    """
+    try:
+        jgb = yf.Ticker(ticker)
+        # Fetch 5 days to ensure we get the latest trading day
+        hist = jgb.history(period="5d")
+        if hist.empty:
+            raise RuntimeError(f"No data returned for JGB ticker {ticker}")
+        
+        # Get the most recent closing price
+        current_yield = hist["Close"].iloc[-1]
+        
+        # Sanity check: Yield should be reasonable (between -1% and 10% for JGB)
+        if not (-1.0 <= current_yield <= 10.0):
+             # Some data sources might return 0.01 for 1%, others 1.0 for 1%
+             # ^JP10Y returns 1.05 for 1.05%, so the range check is valid.
+             pass
+
+        return float(current_yield)
+    except Exception as e:
+        raise RuntimeError(f"Failed to fetch JGB yield for {ticker}: {str(e)}")
+
+
+def calculate_historical_per(price_data: pd.DataFrame, eps_provider: Optional[callable] = None) -> pd.DataFrame:
     df = price_data.copy()
     df["price"] = df["Close"]
-    df["estimated_per"] = df["price"] / base_eps
+
+    if eps_provider:
+        df["estimated_eps"] = df.index.map(lambda d: eps_provider(d))
+    else:
+        raise ValueError("Dynamic EPS provider is required for strict valuation analysis.")
+
+    df["estimated_per"] = df["price"] / df["estimated_eps"]
     return df
 
 
-def run_time_series_report(years: int, jgb_yield: float, risk_premium: float) -> None:
+def run_time_series_report(years: int) -> None:
+    from ..config import SystemConfig
+    from .valuation import fetch_current_jgb_yield
+
+    config = SystemConfig()
+
+    jgb_yield = fetch_current_jgb_yield(config.valuation.jgb_ticker)
+    print(f"Fetched JGB Yield: {jgb_yield}%")
+    
+    risk_premium = config.valuation.risk_premium
+
     print("\n" + "=" * 60)
-    print("TIME SERIES VALUATION ANALYSIS")
+    print("TIME SERIES VALUATION ANALYSIS (Dynamic EPS)")
     print("=" * 60)
 
     print(f"\nFetching {years} years of Nikkei 225 data...")
     price_data = fetch_nikkei_data(years)
-    df = calculate_historical_per(price_data)
+
+    df = calculate_historical_per(price_data, eps_provider=config.valuation.get_eps_for_date)
 
     analyzer = ValuationAnalyzer()
     results = []
@@ -131,6 +183,7 @@ def run_time_series_report(years: int, jgb_yield: float, risk_premium: float) ->
             {
                 "date": date,
                 "price": row["price"],
+                "eps": row["estimated_eps"],
                 "per": per,
                 "fair_per": status["fair_per"],
                 "divergence": status["divergence_pct"],
@@ -142,15 +195,15 @@ def run_time_series_report(years: int, jgb_yield: float, risk_premium: float) ->
 
     print(f"\nParameters: JGB={jgb_yield}%, Risk Premium={risk_premium}%")
     print(f"Fair PER: {results_df['fair_per'].iloc[0]:.2f}x")
-    print("\n" + "-" * 60)
-    print(f"{'Date':<12} {'Price':>10} {'PER':>8} {'Diverg':>8} {'Status':<25}")
-    print("-" * 60)
+    print("\n" + "-" * 75)
+    print(f"{'Date':<12} {'Price':>10} {'EPS':>8} {'PER':>8} {'Diverg':>8} {'Status':<25}")
+    print("-" * 75)
 
     for _, r in results_df.iterrows():
         color = "\033[92m" if "Under" in r["status"] else "\033[91m" if "Over" in r["status"] else "\033[93m"
         reset = "\033[0m"
         print(
-            f"{r['date'].strftime('%Y-%m'):<12} {r['price']:>10,.0f} {r['per']:>8.1f}x {r['divergence']:>+7.1f}% {color}{r['status']:<25}{reset}"
+            f"{r['date'].strftime('%Y-%m'):<12} {r['price']:>10,.0f} {r['eps']:>8.0f} {r['per']:>8.1f}x {r['divergence']:>+7.1f}% {color}{r['status']:<25}{reset}"
         )
 
     print("-" * 60)

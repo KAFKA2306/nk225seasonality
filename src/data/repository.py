@@ -34,7 +34,7 @@ class MarketDataRepository:
         );
         CREATE INDEX IF NOT EXISTS idx_trade_date ON nikkei_daily_data(trade_date);
         """
-        # Use direct connection to avoid recursion loop from _get_connection
+
         with sqlite3.connect(self.db_path, timeout=30) as conn:
             conn.executescript(schema_sql)
             conn.commit()
@@ -44,7 +44,7 @@ class MarketDataRepository:
         if not self._db_initialized:
             self._ensure_database_schema()
             self._db_initialized = True
-            
+
         conn = sqlite3.connect(self.db_path, timeout=30)
         conn.row_factory = sqlite3.Row
         yield conn

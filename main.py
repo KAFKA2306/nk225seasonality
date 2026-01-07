@@ -35,13 +35,13 @@ def run():
     # Valuation Command
     val = subparsers.add_parser("valuation", help="Market Valuation (Yield Gap) Analysis")
     val.add_argument("--current-per", type=float, default=16.0, help="Current Market PER")
-    val.add_argument("--jgb-yield", type=float, default=1.0, help="JGB 10Y/30Y Yield %")
+    # jgb-yield is now dynamic
     val.add_argument("--risk-premium", type=float, default=3.5, help="Equity Risk Premium %")
 
     # Time Series Valuation Command
     valts = subparsers.add_parser("valuation-ts", help="Time Series Valuation Analysis")
     valts.add_argument("--years", type=int, default=10, help="Years of history")
-    valts.add_argument("--jgb-yield", type=float, default=3.5, help="JGB Yield %")
+    # jgb-yield is now dynamic
     valts.add_argument("--risk-premium", type=float, default=3.5, help="Risk Premium %")
 
     # Seasonality Command
@@ -51,9 +51,17 @@ def run():
     args = parser.parse_args()
 
     if args.command == "valuation":
-        run_analysis_report(args.jgb_yield, args.current_per, args.risk_premium)
+        # Updated to remove static yield
+        from src import SystemConfig
+        from src.analysis.valuation import fetch_current_jgb_yield
+        
+        config = SystemConfig()
+        current_yield = fetch_current_jgb_yield(config.valuation.jgb_ticker)
+        print(f"Fetched JGB Yield: {current_yield}%")
+        
+        run_analysis_report(current_yield, args.current_per, args.risk_premium)
     elif args.command == "valuation-ts":
-        run_time_series_report(args.years, args.jgb_yield, args.risk_premium)
+        run_time_series_report(args.years)
     elif args.command == "seasonality":
         asyncio.run(run_seasonality(args))
     else:

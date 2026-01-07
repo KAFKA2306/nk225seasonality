@@ -243,22 +243,15 @@ class SeasonalityVisualizer:
         data: pd.DataFrame,
         save_path: Optional[str] = None,
     ) -> plt.Figure:
-        """
-        Creates a boxplot of monthly returns distributions.
-        Shows Median, IQR, Whiskers (1.5 IQR), and Outliers.
-        """
         if "returns" not in data.columns:
             data = data.copy()
             data["returns"] = data["close_price"].pct_change()
-        
+
         data["month"] = data.index.month
-        month_data = [
-            data[data["month"] == m]["returns"].dropna() * 100 for m in range(1, 13)
-        ]
-        
+        month_data = [data[data["month"] == m]["returns"].dropna() * 100 for m in range(1, 13)]
+
         fig, ax = plt.subplots(figsize=self.figsize)
-        
-        # Create boxplot
+
         bp = ax.boxplot(
             month_data,
             patch_artist=True,
@@ -266,14 +259,13 @@ class SeasonalityVisualizer:
             vert=True,
             labels=["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
         )
-        
-        # Style
-        for patch in bp['boxes']:
+
+        for patch in bp["boxes"]:
             patch.set_facecolor(self.colors["primary"])
             patch.set_alpha(0.6)
             patch.set_edgecolor("black")
-            
-        for median in bp['medians']:
+
+        for median in bp["medians"]:
             median.set_color(self.colors["danger"])
             median.set_linewidth(2)
 
@@ -281,8 +273,7 @@ class SeasonalityVisualizer:
         ax.set_ylabel("Return (%)")
         ax.set_xlabel("Month")
         ax.grid(True, axis="y", alpha=0.3)
-        
-        # Add zero line
+
         ax.axhline(y=0, color="black", linestyle="-", linewidth=1, alpha=0.5)
 
         plt.tight_layout()
@@ -295,34 +286,24 @@ class SeasonalityVisualizer:
         data: pd.DataFrame,
         save_path: Optional[str] = None,
     ) -> plt.Figure:
-        """
-        Creates a Year x Month heatmap of returns.
-        Visualizes stability of patterns over time.
-        """
         if "returns" not in data.columns:
             data = data.copy()
             data["returns"] = data["close_price"].pct_change()
 
-        pivot_table = data.pivot_table(
-            values="returns",
-            index=data.index.year,
-            columns=data.index.month,
-            aggfunc="sum" # Monthly return is effectively sum of daily log returns approx, or simple compound. 
-            # ideally resampling, but pivot of daily returns isn't right. 
-            # We need to resample to monthly first.
-        ) * 100
-        
-        # Re-process for accurate monthly values
+        pivot_table = (
+            data.pivot_table(values="returns", index=data.index.year, columns=data.index.month, aggfunc="sum") * 100
+        )
+
         monthly_data = data["close_price"].resample("ME").last().pct_change() * 100
         pivot_table = pd.DataFrame(index=monthly_data.index.year.unique(), columns=range(1, 13))
-        
+
         for date, val in monthly_data.items():
             pivot_table.loc[date.year, date.month] = val
-            
-        pivot_table = pivot_table.astype(float).sort_index(ascending=False) # Newest years top
-        
+
+        pivot_table = pivot_table.astype(float).sort_index(ascending=False)
+
         fig, ax = plt.subplots(figsize=(14, len(pivot_table) * 0.5 + 2))
-        
+
         sns.heatmap(
             pivot_table,
             annot=True,
@@ -332,14 +313,14 @@ class SeasonalityVisualizer:
             ax=ax,
             cbar_kws={"label": "Return (%)"},
             linewidths=0.5,
-            linecolor="#334155"
+            linecolor="#334155",
         )
-        
+
         ax.set_title("Monthly Returns Heatmap (Stability Matrix)", fontsize=16, fontweight="bold", pad=20)
         ax.set_xlabel("Month")
         ax.set_ylabel("Year")
         ax.set_xticklabels(["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"])
-        
+
         plt.tight_layout()
         if save_path:
             self._save_plot(fig, save_path)
@@ -350,34 +331,44 @@ class SeasonalityVisualizer:
         data: pd.DataFrame,
         save_path: Optional[str] = None,
     ) -> plt.Figure:
-        """
-        Creates a publication-grade Valuation Chart.
-        Plots:
-        1. Actual PER vs Theoretical PER (Fair Value)
-        2. JGB Yield (context)
-        3. Divergence (Over/Undervaluation)
-        """
         # Ensure data availability
         required = ["per", "fair_per", "close_price", "divergence"]
         if not all(col in data.columns for col in required):
-             # If columns are missing, we cannot plot. 
-             # Previously we had magic numbers here, but that violates user rules.
-             # We assume pipeline has populated these. If not, we log a warning or return empty figure.
-             # For now, let's just use what we have or return early to avoid crashing, 
-             # but strictly NO MAGIC NUMBERS.
-             # In a real app we might raise ValueError("Missing valuation data from pipeline")
-             pass 
-        
+            pass
+
         df = data
 
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 10), height_ratios=[2, 1], sharex=True)
-        
+
         # Upper Plot: PERs
         ax1.plot(df.index, df["per"], label="Actual PER", color=self.colors["primary"], linewidth=2)
-        ax1.plot(df.index, df["fair_per"], label="Theoretical PER (Fair Value)", color=self.colors["success"], linestyle="--", linewidth=2)
-        ax1.fill_between(df.index, df["per"], df["fair_per"], where=(df["per"] > df["fair_per"]), color=self.colors["danger"], alpha=0.1, label="Overvalued")
-        ax1.fill_between(df.index, df["per"], df["fair_per"], where=(df["per"] <= df["fair_per"]), color=self.colors["success"], alpha=0.1, label="Undervalued")
-        
+        ax1.plot(
+            df.index,
+            df["fair_per"],
+            label="Theoretical PER (Fair Value)",
+            color=self.colors["success"],
+            linestyle="--",
+            linewidth=2,
+        )
+        ax1.fill_between(
+            df.index,
+            df["per"],
+            df["fair_per"],
+            where=(df["per"] > df["fair_per"]),
+            color=self.colors["danger"],
+            alpha=0.1,
+            label="Overvalued",
+        )
+        ax1.fill_between(
+            df.index,
+            df["per"],
+            df["fair_per"],
+            where=(df["per"] <= df["fair_per"]),
+            color=self.colors["success"],
+            alpha=0.1,
+            label="Undervalued",
+        )
+
         ax1.set_title("Nikkei 225 Valuation Model (Yield Gap Approach)", fontsize=16, fontweight="bold", pad=20)
         ax1.set_ylabel("PER (Ratio)")
         ax1.legend(loc="upper left")
@@ -389,10 +380,14 @@ class SeasonalityVisualizer:
         ax2.axhline(y=0, color="black", linestyle="-", linewidth=1)
         ax2.axhline(y=20, color=self.colors["danger"], linestyle=":", alpha=0.5)
         ax2.axhline(y=-20, color=self.colors["success"], linestyle=":", alpha=0.5)
-        
+
         # Color areas based on levels
-        ax2.fill_between(df.index, df["divergence"], 20, where=(df["divergence"] > 20), color=self.colors["danger"], alpha=0.3)
-        ax2.fill_between(df.index, df["divergence"], -20, where=(df["divergence"] < -20), color=self.colors["success"], alpha=0.3)
+        ax2.fill_between(
+            df.index, df["divergence"], 20, where=(df["divergence"] > 20), color=self.colors["danger"], alpha=0.3
+        )
+        ax2.fill_between(
+            df.index, df["divergence"], -20, where=(df["divergence"] < -20), color=self.colors["success"], alpha=0.3
+        )
 
         ax2.set_title("Home-made Valuation Divergence", fontsize=12, fontweight="bold")
         ax2.set_ylabel("Divergence (%)")
@@ -412,16 +407,12 @@ class SeasonalityVisualizer:
         title: Optional[str] = None,
         save_path: Optional[str] = None,
     ) -> plt.Figure:
-        """
-        Creates a publication-grade Bar Chart for seasonal metrics.
-        Replaces the hard-to-read 1D heatmap.
-        """
         month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
         months = range(1, 13)
         values = []
         colors = []
         significance_markers = []
-        
+
         for m in months:
             result = seasonality_results.get(m)
             if not result:
@@ -429,51 +420,58 @@ class SeasonalityVisualizer:
                 colors.append(self.colors["secondary"])
                 significance_markers.append("")
                 continue
-                
+
             if metric == "mean_return":
                 val = result.mean_return * 100
                 values.append(val)
                 colors.append(self.colors["success"] if val >= 0 else self.colors["danger"])
-                marker = "**" if result.is_significant and result.t_pvalue < 0.01 else "*" if result.is_significant else ""
+                marker = (
+                    "**" if result.is_significant and result.t_pvalue < 0.01 else "*" if result.is_significant else ""
+                )
                 significance_markers.append(marker)
             elif metric == "t_pvalue":
                 val = result.t_pvalue
                 values.append(val)
-                # Highlights significant p-values
-                colors.append(self.colors["primary"] if val > 0.05 else self.colors["danger"]) 
+                colors.append(self.colors["primary"] if val > 0.05 else self.colors["danger"])
                 significance_markers.append("")
 
         fig, ax = plt.subplots(figsize=self.figsize)
-        
+
         bars = ax.bar(month_names, values, color=colors, alpha=0.8, edgecolor="black", linewidth=0.5)
-        
+
         # Annotations
         if metric == "mean_return":
             ax.axhline(0, color="black", linewidth=1)
             ax.set_ylabel("Mean Return (%)")
-            # Add significance markers on top of bars
             for bar, marker in zip(bars, significance_markers):
                 if marker:
                     height = bar.get_height()
                     offset = max(values) * 0.05 if height >= 0 else -max(abs(min(values)), 1) * 0.1
-                    ax.text(bar.get_x() + bar.get_width()/2., height + offset,
-                            marker, ha='center', va='bottom' if height >= 0 else 'top', 
-                            fontsize=14, fontweight='bold', color='black')
-                            
+                    ax.text(
+                        bar.get_x() + bar.get_width() / 2.0,
+                        height + offset,
+                        marker,
+                        ha="center",
+                        va="bottom" if height >= 0 else "top",
+                        fontsize=14,
+                        fontweight="bold",
+                        color="black",
+                    )
+
         elif metric == "t_pvalue":
             ax.axhline(0.05, color=self.colors["danger"], linestyle="--", linewidth=1.5, label="p=0.05")
             ax.axhline(0.10, color=self.colors["warning"], linestyle=":", linewidth=1.5, label="p=0.10")
             ax.set_ylabel("P-Value")
             ax.legend(loc="upper right")
-            ax.set_ylim(0, max(max(values), 0.2)) # Ensure we see the small p-values structure
+            ax.set_ylim(0, max(max(values), 0.2))  # Ensure we see the small p-values structure
 
         ax.set_title(title or self._get_metric_title(metric), fontsize=16, fontweight="bold", pad=20)
         ax.grid(True, axis="y", alpha=0.3)
-        
+
         plt.tight_layout()
         if save_path:
             self._save_plot(fig, save_path)
-            
+
         return fig
 
     def _save_plot(self, fig: plt.Figure, save_path: str):
@@ -481,4 +479,3 @@ class SeasonalityVisualizer:
         path.parent.mkdir(parents=True, exist_ok=True)
         fig.savefig(path, dpi=self.dpi, bbox_inches="tight")
         plt.close(fig)
-

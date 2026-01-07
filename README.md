@@ -1,5 +1,8 @@
 # Nikkei 225 Seasonality Analysis System
 
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Pages](https://img.shields.io/badge/Dashboard-GitHub%20Pages-blue)](https://kafka2306.github.io/nk225seasonality/)
 
 > **日本株市場の季節性パターン検出とバリュエーション分析のためのプロフェッショナル向け定量的金融プラットフォーム**
@@ -31,7 +34,7 @@
 ## 🛠️ クイックスタート
 
 ### 前提条件
-- **Python 3.12+**
+- **Python 3.10+**
 - **uv** (最新のPythonパッケージインストーラー)
 
 ### インストール
@@ -42,20 +45,21 @@ task setup
 ### 📉 バリュエーション分析
 現在の市場が割安か割高かを分析します。
 ```bash
-# デフォルト設定で実行
+# デフォルト設定で実行（JGB利回りはYahoo Financeから自動取得）
 task valuation
 
-# シナリオ分析（例: JGB利回りが3.5%に上昇した場合）
-task valuation YIELD=3.5 PER=19.75
+# シナリオ分析（PERのみ指定）
+task valuation PER=19.75
 ```
 
 ### 📈 時系列バリュエーション分析
 過去の市場バリュエーションの変化を時系列で分析します。
 ```bash
 # 過去5年間の月次バリュエーション推移
-task valuation-ts YEARS=5 YIELD=3.5
+task valuation-ts YEARS=5
 
 # 出力例: 月次PER、適正PER、乖離率、割安/割高判定
+# （JGB利回りは取得時点の最新値を使用）
 ```
 
 ### 🗓️ 季節性分析
@@ -76,9 +80,11 @@ uv run python main.py seasonality --years 5
 │   ├── risk/           # モンテカルロ・VaRエンジン
 │   └── visualization/  # 描画・レポーティング
 ├── tests/              # 網羅的なテストスイート
+├── scripts/            # ユーティリティスクリプト
 ├── main.py             # 統合CLIエントリーポイント
 ├── pyproject.toml      # プロジェクト設定・依存関係
 └── Taskfile.yml        # 自動化スクリプト
 ```
+
 ---
 **Built for Quantitative Excellence.**

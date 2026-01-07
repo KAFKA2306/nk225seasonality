@@ -38,24 +38,30 @@ class RiskConfig:
 @dataclass
 class ValuationConfig:
     assumed_eps: float
-    jgb_yield: float
+    jgb_ticker: str
     risk_premium: float
     years_for_analysis: int
     historical_eps: Dict[int, float] = None
 
     def __post_init__(self):
         if self.historical_eps is None:
-            # Approximate Historical EPS for Nikkei 225 (Destructive Improvement)
-            # Source: Approximate weighted average based on publicly available historical data
             self.historical_eps = {
-                2014: 1050, 2015: 1200, 2016: 1180, 2017: 1400,
-                2018: 1700, 2019: 1650, 2020: 1600, 2021: 2000,
-                2022: 2150, 2023: 2250, 2024: 2400, 2025: 2500,
-                2026: 2550 # Forecast
+                2014: 1050,
+                2015: 1200,
+                2016: 1180,
+                2017: 1400,
+                2018: 1700,
+                2019: 1650,
+                2020: 1600,
+                2021: 2000,
+                2022: 2150,
+                2023: 2250,
+                2024: 2400,
+                2025: 2500,
+                2026: 2550,
             }
-    
+
     def get_eps_for_date(self, date_obj: Any) -> float:
-        """Returns EPS for a given year, falling back to assumed_eps."""
         year = date_obj.year
         return self.historical_eps.get(year, self.assumed_eps)
 
@@ -142,9 +148,9 @@ class SystemConfig:
     def _setup_valuation_config(self) -> None:
         self.valuation = ValuationConfig(
             assumed_eps=float(os.getenv("VALUATION_EPS", "2400")),
-            jgb_yield=float(os.getenv("VALUATION_JGB_YIELD", "3.5")),
+            jgb_ticker=os.getenv("VALUATION_JGB_TICKER", "^JP10Y"),
             risk_premium=float(os.getenv("VALUATION_RISK_PREMIUM", "3.5")),
-            years_for_analysis=int(os.getenv("VALUATION_YEARS", "5")),
+            years_for_analysis=int(os.getenv("VALUATION_YEARS", "10")),
         )
 
     def _setup_database_config(self) -> None:
@@ -198,7 +204,7 @@ class SystemConfig:
             "risk": {"max_position_size": self.risk.max_position_size},
             "valuation": {
                 "assumed_eps": self.valuation.assumed_eps,
-                "jgb_yield": self.valuation.jgb_yield,
+                "jgb_ticker": self.valuation.jgb_ticker,
                 "risk_premium": self.valuation.risk_premium,
             },
             "database": {

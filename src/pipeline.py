@@ -40,32 +40,31 @@ class AnalysisPipeline:
             }
         }
 
-        # Phase 1: Data
         raw_data = await self.data_ingestion.collect_data(start_date, end_date)
         validation_results = self.data_validator.validate_dataset(raw_data)
-        
+
         if "returns" not in raw_data.columns:
             raw_data["returns"] = raw_data.get("adjusted_close", raw_data["close_price"]).pct_change()
-            
-        # --- Value Analysis Injection (Destructive Improvement) ---
-        # NOTE: Ideally this comes from a DataProvider, but for "Destructive Speed" we inject here to enable the chart.
-        # --- Value Analysis Injection (Destructive Improvement) ---
-        # NOTE: Ideally this comes from a DataProvider, but for "Destructive Speed" we inject here to enable the chart.
-        # Assumptions used for valuation (from config)
-        jgb_yield = self.config.valuation.jgb_yield
-        risk_premium = self.config.valuation.risk_premium
-        fair_per = 100 / (jgb_yield + risk_premium)
-        
-        # Dynamic EPS Calculation
+
+        if "returns" not in raw_data.columns:
+            raw_data["returns"] = raw_data.get("adjusted_close", raw_data["close_price"]).pct_change()
+
+        from .analysis.valuation import fetch_current_jgb_yield
+
         val_config = self.config.valuation
+        jgb_yield = fetch_current_jgb_yield(val_config.jgb_ticker)
         
-        # Create a series of EPS values based on year
+        # Log the fetched yield for verification
+        print(f"Fetched JGB Yield for {val_config.jgb_ticker}: {jgb_yield}%")
+
+        risk_premium = val_config.risk_premium
+        fair_per = 100 / (jgb_yield + risk_premium)
+
         eps_series = raw_data.index.map(lambda d: val_config.get_eps_for_date(d))
-        
+
         raw_data["per"] = raw_data["close_price"] / eps_series
         raw_data["fair_per"] = fair_per
         raw_data["divergence"] = (raw_data["per"] - fair_per) / fair_per * 100
-        # -----------------------------------------------------------
 
         if not skip_storage:
             self.data_repository.store_data(raw_data, "pipeline_analysis")
@@ -76,7 +75,6 @@ class AnalysisPipeline:
             "data_quality_valid": validation_results.is_valid,
         }
 
-        # Phase 2: Analysis
         data = raw_data
         seasonality_analyzer = SeasonalityAnalyzer(data, self.config.analysis.significance_level)
         seasonality_results = seasonality_analyzer.test_monthly_patterns()
@@ -100,9 +98,7 @@ class AnalysisPipeline:
             "significant_months": [m for m, r in seasonality_results.items() if r.is_significant],
         }
 
-        # Phase 3: Visualization (Seasonality)
         if save_results:
-            # Bar Charts (Replaces Heatmaps)
             self.seasonality_viz.create_seasonal_bar_chart(
                 seasonality_results,
                 metric="mean_return",
@@ -115,26 +111,17 @@ class AnalysisPipeline:
                 title="Statistical Significance (P-Values)",
                 save_path="seasonality/barchart_pvalues.png",
             )
-            # Time Series
             self.seasonality_viz.create_seasonal_time_series(
                 data,
                 highlight_months=[m for m, r in seasonality_results.items() if r.is_significant],
                 save_path="seasonality/timeseries_seasonality.png",
             )
-            
-            # --- Publication Grade Visuals ---
+
             self.seasonality_viz.create_monthly_distribution_boxplot(
-                data,
-                save_path="seasonality/boxplot_distribution.png"
+                data, save_path="seasonality/boxplot_distribution.png"
             )
-            self.seasonality_viz.create_year_month_heatmap(
-                data,
-                save_path="seasonality/heatmap_year_month.png"
-            )
-            self.seasonality_viz.create_valuation_chart(
-                data,
-                save_path="seasonality/valuation_timeseries.png"
-            )
+            self.seasonality_viz.create_year_month_heatmap(data, save_path="seasonality/heatmap_year_month.png")
+            self.seasonality_viz.create_valuation_chart(data, save_path="seasonality/valuation_timeseries.png")
 
             pipeline_results["visualization"] = {
                 "seasonality_returns_chart": "seasonality/barchart_returns.png",
@@ -145,7 +132,6 @@ class AnalysisPipeline:
                 "valuation_timeseries": "seasonality/valuation_timeseries.png",
             }
 
-        # Phase 6: Summary
         pipeline_results["summary"] = {
             "key_findings": {"significant_months": pipeline_results["analysis_phase"]["significant_months"]}
         }
