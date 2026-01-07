@@ -1,6 +1,6 @@
 # Nikkei 225 Seasonality Analysis System
 
-[![Pages](https://img.shields.io/badge/Dashboard-GitHub%20Pages-blue)](https://YOUR_USERNAME.github.io/nk225seasonality/)
+[![Pages](https://img.shields.io/badge/Dashboard-GitHub%20Pages-blue)](https://kafka2306.github.io/nk225seasonality/)
 
 > **日本株市場の季節性パターン検出とバリュエーション分析のためのプロフェッショナル向け定量的金融プラットフォーム**
 
