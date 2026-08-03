@@ -5,85 +5,113 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Pages](https://img.shields.io/badge/Dashboard-GitHub%20Pages-blue)](https://kafka2306.github.io/nk225seasonality/)
 
-> **日本株市場の季節性パターン検出とバリュエーション分析のためのプロフェッショナル向け定量的金融プラットフォーム**
+> **日本株市場の季節性パターン検出と、時点整合的なバリュエーション分析のための定量プラットフォーム**
 
-## 🚀 概要
+## 概要
 
-本システムは、日経225指数の高度な統計的検定と堅牢なバリュエーションモデルを組み合わせた、機関投資家レベルの分析ツールです。市場の歪みや適正価格を精密に分析し、データに基づいた意思決定を行うトレーダーや研究者向けに設計されています。
+本システムは、日経225指数の季節性検定とバリュエーション分析を統合します。過去の割高・割安判定では、実行日の金利を全期間へ適用せず、各価格観測日以前に取得可能だった10年JGB利回りを使用します。
 
-## ✨ 主な機能
+## 主な機能
 
-### 📊 市場バリュエーションダッシュボード
-金利動向に基づいた市場の割安・割高をリアルタイムで評価します。
-- **イールドギャップ分析**: 株式益利回りとJGB（日本国債）利回りを瞬時に比較。
-- **適正PERモデリング**: リスクプレミアムに基づいた「適正PER」を算出。
-- **バリュエーション判定**: 「割高/割安」のシグナルと乖離率を可視化。
+### 市場バリュエーション
 
-### 📅 高度な季節性分析エンジン
-統計的に有意な繰り返しパターンを検出・検証します。
-- **月次・四半期季節性**: 「セル・イン・メイ」や「掉尾の一振（年末ラリー）」などの強力なトレンドを特定。
-- **年度末効果**: 3月末の機関投資家のリバランスによる影響を定量化。
-- **メカニズム分析**: 観測された市場アノマリーの要因を分析。
+- **イールドギャップ分析:** 株式益利回りと10年JGB利回りを比較
+- **適正PER:** `100 / (JGB利回り + 株式リスクプレミアム)`
+- **point-in-time評価:** 各価格日以前の最新JGB観測値をbackward as-of join
+- **証跡:** 使用したJGB観測日、欠損件数、ticker、計算方式を保存
+- **現在金利シナリオ:** 過去時点評価を上書きせず、`current_rate_revaluation_*` の別系列として出力
 
-### 🛡️ クリーンでモダンなアーキテクチャ
-信頼性と使いやすさを追求した最新のPython標準で構築されています。
-- **クリーンアーキテクチャ**: ルートディレクトリを最小限に抑え、関心事を分離。
-- **最新のツール群**: `uv` による高速な依存関係管理、`ruff` によるコード品質維持。
-- **自動化ワークフロー**: `Taskfile` によるワンコマンド操作。
+対象日より後のJGB値しか存在しない場合は未来値をbackfillせず、`jgb_yield`、`fair_per`、`divergence`を欠損として扱います。
 
-## 🛠️ クイックスタート
+### 季節性分析
+
+- 月次・四半期季節性
+- 年度末効果
+- 曜日効果とローリング分析
+- メカニズム分析
+
+## クイックスタート
 
 ### 前提条件
-- **Python 3.10+**
-- **uv** (最新のPythonパッケージインストーラー)
+
+- Python 3.10+
+- uv
 
 ### インストール
+
 ```bash
 task setup
 ```
 
-### 📉 バリュエーション分析
-現在の市場が割安か割高かを分析します。
-```bash
-# デフォルト設定で実行（JGB利回りはYahoo Financeから自動取得）
-task valuation
+### 現在時点のバリュエーション
 
-# シナリオ分析（PERのみ指定）
+```bash
+task valuation
 task valuation PER=19.75
 ```
 
-### 📈 時系列バリュエーション分析
-過去の市場バリュエーションの変化を時系列で分析します。
-```bash
-# 過去5年間の月次バリュエーション推移
-task valuation-ts YEARS=5
+### 時系列バリュエーション
 
-# 出力例: 月次PER、適正PER、乖離率、割安/割高判定
-# （JGB利回りは取得時点の最新値を使用）
+```bash
+task valuation-ts YEARS=5
 ```
 
-### 🗓️ 季節性分析
-過去のデータに基づいて統計的検定を実行します。
+出力列:
+
+```text
+price
+estimated_eps
+estimated_per
+jgb_yield
+jgb_observed_at
+fair_per
+divergence
+valuation_status
+valuation_method
+current_rate_revaluation_jgb_yield
+current_rate_revaluation_fair_per
+current_rate_revaluation_divergence
+```
+
+`fair_per` と `divergence` が正準の時点評価です。`current_rate_revaluation_*` は、現在の金利条件を過去価格へ当てるシナリオであり、正準系列とは分離されます。
+
+### 季節性分析
+
 ```bash
-# 過去5年分の分析を実行
 uv run python main.py seasonality --years 5
 ```
 
-## 🏗️ アーキテクチャ
+季節性パイプラインもCLIと同じ `apply_point_in_time_valuation()` を使用するため、チャートと時系列レポートの計算境界は一致します。
 
+## 検証
+
+```bash
+uv run pytest
+uv run ruff check .
 ```
+
+回帰テストでは以下を固定します。
+
+- 月ごとに直前のJGB観測値を選ぶ
+- 未来のJGB値を過去へbackfillしない
+- 現在金利シナリオを変えても過去のpoint-in-time系列が変わらない
+- UTCとJSTの時刻差で観測日の対応がずれない
+
+## アーキテクチャ
+
+```text
 .
 ├── src/
-│   ├── analysis/       # バリュエーションおよび統計モデル
-│   ├── data/           # データ収集・検証パイプライン
-│   ├── options/        # オプション価格計算・戦略ロジック
-│   ├── risk/           # モンテカルロ・VaRエンジン
-│   └── visualization/  # 描画・レポーティング
-├── tests/              # 網羅的なテストスイート
-├── scripts/            # ユーティリティスクリプト
-├── main.py             # 統合CLIエントリーポイント
-├── pyproject.toml      # プロジェクト設定・依存関係
-└── Taskfile.yml        # 自動化スクリプト
+│   ├── analysis/
+│   ├── data/
+│   ├── options/
+│   ├── risk/
+│   └── visualization/
+├── tests/
+├── scripts/
+├── main.py
+├── pyproject.toml
+└── Taskfile.yml
 ```
 
 ---
