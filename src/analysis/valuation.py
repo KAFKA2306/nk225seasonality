@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
+import numpy as np
 import pandas as pd
 import yfinance as yf
 
@@ -31,22 +34,12 @@ class ValuationAnalyzer:
             return float("inf")
         return 1 / discount_rate
 
-    def calculate_valuation_status(self, metrics: ValuationMetrics) -> Dict[str, any]:
+    def calculate_valuation_status(self, metrics: ValuationMetrics) -> Dict[str, Any]:
         fair_per = self.calculate_fair_per(metrics)
         yield_gap = self.calculate_yield_gap(metrics)
-
         divergence_pct = ((metrics.current_per - fair_per) / fair_per) * 100
 
-        status = "Fairly Valued"
-        if divergence_pct > 20:
-            status = "Significantly Overvalued"
-        elif divergence_pct > 10:
-            status = "Overvalued"
-        elif divergence_pct < -20:
-            status = "Significantly Undervalued"
-        elif divergence_pct < -10:
-            status = "Undervalued"
-
+        status = valuation_status(divergence_pct)
         return {
             "current_per": metrics.current_per,
             "fair_per": round(fair_per, 2),
@@ -57,6 +50,20 @@ class ValuationAnalyzer:
             "status": status,
             "metrics": metrics,
         }
+
+
+def valuation_status(divergence_pct: float) -> str:
+    if pd.isna(divergence_pct):
+        return "Unavailable"
+    if divergence_pct > 20:
+        return "Significantly Overvalued"
+    if divergence_pct > 10:
+        return "Overvalued"
+    if divergence_pct < -20:
+        return "Significantly Undervalued"
+    if divergence_pct < -10:
+        return "Undervalued"
+    return "Fairly Valued"
 
 
 def run_analysis_report(jgb_yield: float, current_per: float, risk_premium: float) -> None:
@@ -79,7 +86,6 @@ def run_analysis_report(jgb_yield: float, current_per: float, risk_premium: floa
     print(f"  Fair PER:        {result['fair_per']:>6.2f}x (1 / (Bond Yield + Risk Premium))")
 
     print("\nCONCLUSION:")
-
     color = (
         "\033[92m"
         if "Undervalued" in result["status"]
@@ -88,128 +94,215 @@ def run_analysis_report(jgb_yield: float, current_per: float, risk_premium: floa
         else "\033[93m"
     )
     reset = "\033[0m"
-
     print(f"  Status:          {color}{result['status']}{reset}")
     print(f"  Divergence:      {result['divergence_pct']:>+6.2f}% from Fair Value")
     print("\n" + "=" * 50)
 
 
+def _utc_naive(values: Any) -> pd.DatetimeIndex:
+    index = pd.DatetimeIndex(pd.to_datetime(values))
+    if index.tz is not None:
+        return index.tz_convert("UTC").tz_localize(None)
+    return index
+
+
 def fetch_nikkei_data(years: int) -> pd.DataFrame:
     end = datetime.now()
     start = end - timedelta(days=years * 365)
-    ticker = yf.Ticker("^N225")
-    df = ticker.history(start=start, end=end, interval="1mo")
-    if df.empty:
+    frame = yf.Ticker("^N225").history(start=start, end=end, interval="1mo")
+    if frame.empty:
         raise RuntimeError("Failed to fetch Nikkei 225 data")
-    return df
+    return frame
 
 
 def fetch_current_jgb_yield(ticker: str) -> float:
-    """
-    Fetches the current 10-year JGB yield from Yahoo Finance.
-    Returns the yield as a percentage (e.g., 1.05 for 1.05%).
-    
-    Args:
-        ticker: The ticker symbol for the JGB yield (e.g., ^JP10Y)
-        
-    Returns:
-        float: The current yield in percent.
-        
-    Raises:
-        RuntimeError: If fetching fails or data is empty.
-    """
+    """Fetch the latest 10-year JGB yield in percentage points."""
     try:
-        jgb = yf.Ticker(ticker)
-        # Fetch 5 days to ensure we get the latest trading day
-        hist = jgb.history(period="5d")
-        if hist.empty:
+        history = yf.Ticker(ticker).history(period="5d")
+        if history.empty or "Close" not in history:
             raise RuntimeError(f"No data returned for JGB ticker {ticker}")
-        
-        # Get the most recent closing price
-        current_yield = hist["Close"].iloc[-1]
-        
-        # Sanity check: Yield should be reasonable (between -1% and 10% for JGB)
-        if not (-1.0 <= current_yield <= 10.0):
-             # Some data sources might return 0.01 for 1%, others 1.0 for 1%
-             # ^JP10Y returns 1.05 for 1.05%, so the range check is valid.
-             pass
-
-        return float(current_yield)
-    except Exception as e:
-        raise RuntimeError(f"Failed to fetch JGB yield for {ticker}: {str(e)}")
+        current_yield = float(history["Close"].dropna().iloc[-1])
+        if not -1.0 <= current_yield <= 10.0:
+            raise RuntimeError(f"JGB yield is outside the accepted range: {current_yield}")
+        return current_yield
+    except Exception as exc:
+        raise RuntimeError(f"Failed to fetch JGB yield for {ticker}: {exc}") from exc
 
 
-def calculate_historical_per(price_data: pd.DataFrame, eps_provider: Optional[callable] = None) -> pd.DataFrame:
-    df = price_data.copy()
-    df["price"] = df["Close"]
+def fetch_jgb_yield_history(
+    ticker: str,
+    start: datetime | pd.Timestamp,
+    end: datetime | pd.Timestamp,
+) -> pd.DataFrame:
+    """Fetch dated JGB observations for point-in-time valuation.
 
-    if eps_provider:
-        df["estimated_eps"] = df.index.map(lambda d: eps_provider(d))
-    else:
+    The returned index is UTC-normalized and timezone-naive. No resampling or
+    backward filling is performed here; callers use a backward as-of join so a
+    valuation date can only consume a yield observed on or before that date.
+    """
+    start_timestamp = pd.Timestamp(start)
+    end_timestamp = pd.Timestamp(end)
+    history = yf.Ticker(ticker).history(
+        start=start_timestamp.to_pydatetime(),
+        end=(end_timestamp + pd.Timedelta(days=1)).to_pydatetime(),
+        interval="1d",
+    )
+    if history.empty or "Close" not in history:
+        raise RuntimeError(f"No historical JGB data returned for ticker {ticker}")
+    result = pd.DataFrame(
+        {"jgb_yield": pd.to_numeric(history["Close"], errors="coerce")},
+        index=_utc_naive(history.index),
+    )
+    result.index.name = "jgb_observed_at"
+    result = result.dropna().sort_index()
+    if result.empty:
+        raise RuntimeError(f"Historical JGB data is empty after validation for ticker {ticker}")
+    if not result["jgb_yield"].between(-1.0, 10.0).all():
+        raise RuntimeError(f"Historical JGB data contains values outside the accepted range for {ticker}")
+    return result
+
+
+def calculate_historical_per(
+    price_data: pd.DataFrame,
+    eps_provider: Optional[Callable[[Any], float]] = None,
+) -> pd.DataFrame:
+    frame = price_data.copy()
+    frame["price"] = frame["Close"]
+    if eps_provider is None:
         raise ValueError("Dynamic EPS provider is required for strict valuation analysis.")
+    frame["estimated_eps"] = frame.index.map(lambda value: eps_provider(value))
+    frame["estimated_eps"] = pd.to_numeric(frame["estimated_eps"], errors="coerce")
+    frame.loc[frame["estimated_eps"] <= 0, "estimated_eps"] = np.nan
+    frame["estimated_per"] = frame["price"] / frame["estimated_eps"]
+    return frame
 
-    df["estimated_per"] = df["price"] / df["estimated_eps"]
-    return df
+
+def apply_point_in_time_valuation(
+    frame: pd.DataFrame,
+    jgb_history: pd.DataFrame,
+    *,
+    risk_premium: float,
+    per_column: str,
+    current_jgb_yield: float | None = None,
+) -> pd.DataFrame:
+    """Attach point-in-time fair value using a backward as-of join.
+
+    A row before the first available yield remains missing. Future yields are
+    never backfilled into historical rows. An optional current-rate scenario is
+    emitted under separate columns and never overwrites the historical series.
+    """
+    if per_column not in frame:
+        raise ValueError(f"PER column not found: {per_column}")
+    if "jgb_yield" not in jgb_history:
+        raise ValueError("JGB history must contain a jgb_yield column")
+
+    output = frame.copy()
+    valuation_dates = _utc_naive(output.index)
+    left = pd.DataFrame(
+        {
+            "valuation_date": valuation_dates,
+            "_row_order": np.arange(len(output)),
+        }
+    ).sort_values("valuation_date")
+    right = jgb_history[["jgb_yield"]].copy()
+    right.index = _utc_naive(right.index)
+    right = right.sort_index().reset_index()
+    observed_column = right.columns[0]
+    right = right.rename(columns={observed_column: "jgb_observed_at"})
+
+    joined = pd.merge_asof(
+        left,
+        right,
+        left_on="valuation_date",
+        right_on="jgb_observed_at",
+        direction="backward",
+        allow_exact_matches=True,
+    ).sort_values("_row_order")
+
+    output["jgb_yield"] = joined["jgb_yield"].to_numpy()
+    output["jgb_observed_at"] = joined["jgb_observed_at"].to_numpy()
+    discount_rate = output["jgb_yield"] + risk_premium
+    output["fair_per"] = np.where(discount_rate > 0, 100 / discount_rate, np.nan)
+    output["divergence"] = (
+        (pd.to_numeric(output[per_column], errors="coerce") - output["fair_per"])
+        / output["fair_per"]
+        * 100
+    )
+    output["valuation_status"] = output["divergence"].map(valuation_status)
+    output["valuation_method"] = "historical_point_in_time_jgb_asof"
+
+    if current_jgb_yield is not None:
+        current_discount_rate = current_jgb_yield + risk_premium
+        current_fair_per = 100 / current_discount_rate if current_discount_rate > 0 else np.nan
+        output["current_rate_revaluation_jgb_yield"] = current_jgb_yield
+        output["current_rate_revaluation_fair_per"] = current_fair_per
+        output["current_rate_revaluation_divergence"] = (
+            (pd.to_numeric(output[per_column], errors="coerce") - current_fair_per)
+            / current_fair_per
+            * 100
+        )
+
+    return output
 
 
 def run_time_series_report(years: int) -> None:
     from ..config import SystemConfig
-    from .valuation import fetch_current_jgb_yield
 
     config = SystemConfig()
-
-    jgb_yield = fetch_current_jgb_yield(config.valuation.jgb_ticker)
-    print(f"Fetched JGB Yield: {jgb_yield}%")
-    
     risk_premium = config.valuation.risk_premium
 
     print("\n" + "=" * 60)
-    print("TIME SERIES VALUATION ANALYSIS (Dynamic EPS)")
+    print("TIME SERIES VALUATION ANALYSIS (POINT-IN-TIME JGB)")
     print("=" * 60)
+    print(f"\nFetching {years} years of Nikkei 225 and JGB data...")
 
-    print(f"\nFetching {years} years of Nikkei 225 data...")
     price_data = fetch_nikkei_data(years)
+    per_frame = calculate_historical_per(
+        price_data,
+        eps_provider=config.valuation.get_eps_for_date,
+    )
+    yield_history = fetch_jgb_yield_history(
+        config.valuation.jgb_ticker,
+        per_frame.index.min(),
+        per_frame.index.max(),
+    )
+    current_yield = fetch_current_jgb_yield(config.valuation.jgb_ticker)
+    results = apply_point_in_time_valuation(
+        per_frame,
+        yield_history,
+        risk_premium=risk_premium,
+        per_column="estimated_per",
+        current_jgb_yield=current_yield,
+    )
 
-    df = calculate_historical_per(price_data, eps_provider=config.valuation.get_eps_for_date)
+    print(f"\nRisk premium: {risk_premium}%")
+    print("Historical fair PER uses the latest JGB observation available at or before each month.")
+    print("Current-rate revaluation is retained in separate columns only.")
+    print("\n" + "-" * 110)
+    print(
+        f"{'Date':<12} {'Price':>10} {'EPS':>8} {'PER':>8} {'JGB':>7} "
+        f"{'JGB date':<12} {'Fair PER':>9} {'Diverg':>8} {'Status':<25}"
+    )
+    print("-" * 110)
 
-    analyzer = ValuationAnalyzer()
-    results = []
-
-    for date, row in df.iterrows():
-        per = row["estimated_per"]
-        metrics = ValuationMetrics(jgb_yield, per, risk_premium)
-        status = analyzer.calculate_valuation_status(metrics)
-        results.append(
-            {
-                "date": date,
-                "price": row["price"],
-                "eps": row["estimated_eps"],
-                "per": per,
-                "fair_per": status["fair_per"],
-                "divergence": status["divergence_pct"],
-                "status": status["status"],
-            }
-        )
-
-    results_df = pd.DataFrame(results)
-
-    print(f"\nParameters: JGB={jgb_yield}%, Risk Premium={risk_premium}%")
-    print(f"Fair PER: {results_df['fair_per'].iloc[0]:.2f}x")
-    print("\n" + "-" * 75)
-    print(f"{'Date':<12} {'Price':>10} {'EPS':>8} {'PER':>8} {'Diverg':>8} {'Status':<25}")
-    print("-" * 75)
-
-    for _, r in results_df.iterrows():
-        color = "\033[92m" if "Under" in r["status"] else "\033[91m" if "Over" in r["status"] else "\033[93m"
-        reset = "\033[0m"
+    for index, row in results.iterrows():
+        observed = row["jgb_observed_at"]
+        observed_text = "NA" if pd.isna(observed) else pd.Timestamp(observed).strftime("%Y-%m-%d")
+        jgb_text = "NA" if pd.isna(row["jgb_yield"]) else f"{row['jgb_yield']:.2f}%"
+        fair_text = "NA" if pd.isna(row["fair_per"]) else f"{row['fair_per']:.2f}x"
+        divergence_text = "NA" if pd.isna(row["divergence"]) else f"{row['divergence']:+.1f}%"
         print(
-            f"{r['date'].strftime('%Y-%m'):<12} {r['price']:>10,.0f} {r['eps']:>8.0f} {r['per']:>8.1f}x {r['divergence']:>+7.1f}% {color}{r['status']:<25}{reset}"
+            f"{index.strftime('%Y-%m'):<12} {row['price']:>10,.0f} {row['estimated_eps']:>8.0f} "
+            f"{row['estimated_per']:>8.1f}x {jgb_text:>7} {observed_text:<12} "
+            f"{fair_text:>9} {divergence_text:>8} {row['valuation_status']:<25}"
         )
 
+    available = results.dropna(subset=["divergence"])
     print("-" * 60)
-    print(f"\nSUMMARY ({len(results_df)} periods)")
-    print(f"  Avg PER:        {results_df['per'].mean():.1f}x")
-    print(f"  Avg Divergence: {results_df['divergence'].mean():+.1f}%")
-    print(f"  Max Undervalued: {results_df['divergence'].min():+.1f}%")
-    print(f"  Max Overvalued:  {results_df['divergence'].max():+.1f}%")
+    print(f"\nSUMMARY ({len(available)}/{len(results)} periods with point-in-time JGB evidence)")
+    if not available.empty:
+        print(f"  Avg PER:          {available['estimated_per'].mean():.1f}x")
+        print(f"  Avg Divergence:   {available['divergence'].mean():+.1f}%")
+        print(f"  Max Undervalued:  {available['divergence'].min():+.1f}%")
+        print(f"  Max Overvalued:   {available['divergence'].max():+.1f}%")
     print("=" * 60)
