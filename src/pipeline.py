@@ -1,7 +1,14 @@
 from datetime import datetime
 from typing import Any, Dict, Optional
 
+import pandas as pd
+
 from .analysis import MechanismAnalyzer, SeasonalityAnalyzer, SeasonalRegressionModel
+from .analysis.valuation import (
+    apply_point_in_time_valuation,
+    fetch_current_jgb_yield,
+    fetch_jgb_yield_history,
+)
 from .config import SystemConfig
 from .data import DataIngestionPipeline, DataValidator, MarketDataRepository
 from .options import OptionsCalculator
@@ -31,7 +38,7 @@ class AnalysisPipeline:
         save_results: bool = True,
         skip_storage: bool = False,
     ) -> Dict[str, Any]:
-        pipeline_results = {
+        pipeline_results: Dict[str, Any] = {
             "metadata": {
                 "start_date": start_date,
                 "end_date": end_date,
@@ -44,27 +51,43 @@ class AnalysisPipeline:
         validation_results = self.data_validator.validate_dataset(raw_data)
 
         if "returns" not in raw_data.columns:
-            raw_data["returns"] = raw_data.get("adjusted_close", raw_data["close_price"]).pct_change()
+            raw_data["returns"] = raw_data.get(
+                "adjusted_close",
+                raw_data["close_price"],
+            ).pct_change()
 
-        if "returns" not in raw_data.columns:
-            raw_data["returns"] = raw_data.get("adjusted_close", raw_data["close_price"]).pct_change()
+        valuation_config = self.config.valuation
+        eps_series = raw_data.index.map(valuation_config.get_eps_for_date)
+        raw_data["per"] = raw_data["close_price"] / pd.Series(
+            eps_series,
+            index=raw_data.index,
+            dtype="float64",
+        )
 
-        from .analysis.valuation import fetch_current_jgb_yield
+        jgb_history = fetch_jgb_yield_history(
+            valuation_config.jgb_ticker,
+            raw_data.index.min(),
+            raw_data.index.max(),
+        )
+        current_jgb_yield = fetch_current_jgb_yield(valuation_config.jgb_ticker)
+        raw_data = apply_point_in_time_valuation(
+            raw_data,
+            jgb_history,
+            risk_premium=valuation_config.risk_premium,
+            per_column="per",
+            current_jgb_yield=current_jgb_yield,
+        )
 
-        val_config = self.config.valuation
-        jgb_yield = fetch_current_jgb_yield(val_config.jgb_ticker)
-        
-        # Log the fetched yield for verification
-        print(f"Fetched JGB Yield for {val_config.jgb_ticker}: {jgb_yield}%")
-
-        risk_premium = val_config.risk_premium
-        fair_per = 100 / (jgb_yield + risk_premium)
-
-        eps_series = raw_data.index.map(lambda d: val_config.get_eps_for_date(d))
-
-        raw_data["per"] = raw_data["close_price"] / eps_series
-        raw_data["fair_per"] = fair_per
-        raw_data["divergence"] = (raw_data["per"] - fair_per) / fair_per * 100
+        pipeline_results["metadata"]["valuation_evidence"] = {
+            "method": "historical_point_in_time_jgb_asof",
+            "jgb_ticker": valuation_config.jgb_ticker,
+            "risk_premium": valuation_config.risk_premium,
+            "yield_observation_count": len(jgb_history),
+            "first_yield_observation": jgb_history.index.min(),
+            "last_yield_observation": jgb_history.index.max(),
+            "missing_point_in_time_yield_rows": int(raw_data["jgb_yield"].isna().sum()),
+            "current_rate_revaluation_jgb_yield": current_jgb_yield,
+        }
 
         if not skip_storage:
             self.data_repository.store_data(raw_data, "pipeline_analysis")
@@ -76,7 +99,10 @@ class AnalysisPipeline:
         }
 
         data = raw_data
-        seasonality_analyzer = SeasonalityAnalyzer(data, self.config.analysis.significance_level)
+        seasonality_analyzer = SeasonalityAnalyzer(
+            data,
+            self.config.analysis.significance_level,
+        )
         seasonality_results = seasonality_analyzer.test_monthly_patterns()
         dow_results = seasonality_analyzer.test_day_of_week_patterns()
         quarter_results = seasonality_analyzer.test_quarter_patterns()
@@ -95,7 +121,11 @@ class AnalysisPipeline:
             "quarterly_results": quarter_results,
             "rolling_analysis": rolling_results,
             "mechanism_analysis": mechanism_results,
-            "significant_months": [m for m, r in seasonality_results.items() if r.is_significant],
+            "significant_months": [
+                month
+                for month, result in seasonality_results.items()
+                if result.is_significant
+            ],
         }
 
         if save_results:
@@ -113,15 +143,25 @@ class AnalysisPipeline:
             )
             self.seasonality_viz.create_seasonal_time_series(
                 data,
-                highlight_months=[m for m, r in seasonality_results.items() if r.is_significant],
+                highlight_months=[
+                    month
+                    for month, result in seasonality_results.items()
+                    if result.is_significant
+                ],
                 save_path="seasonality/timeseries_seasonality.png",
             )
-
             self.seasonality_viz.create_monthly_distribution_boxplot(
-                data, save_path="seasonality/boxplot_distribution.png"
+                data,
+                save_path="seasonality/boxplot_distribution.png",
             )
-            self.seasonality_viz.create_year_month_heatmap(data, save_path="seasonality/heatmap_year_month.png")
-            self.seasonality_viz.create_valuation_chart(data, save_path="seasonality/valuation_timeseries.png")
+            self.seasonality_viz.create_year_month_heatmap(
+                data,
+                save_path="seasonality/heatmap_year_month.png",
+            )
+            self.seasonality_viz.create_valuation_chart(
+                data,
+                save_path="seasonality/valuation_timeseries.png",
+            )
 
             pipeline_results["visualization"] = {
                 "seasonality_returns_chart": "seasonality/barchart_returns.png",
@@ -133,8 +173,11 @@ class AnalysisPipeline:
             }
 
         pipeline_results["summary"] = {
-            "key_findings": {"significant_months": pipeline_results["analysis_phase"]["significant_months"]}
+            "key_findings": {
+                "significant_months": pipeline_results["analysis_phase"][
+                    "significant_months"
+                ]
+            }
         }
-
         pipeline_results["success"] = True
         return pipeline_results
