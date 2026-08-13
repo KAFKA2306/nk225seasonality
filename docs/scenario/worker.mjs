@@ -1,5 +1,6 @@
 import { loadPyodide } from "https://cdn.jsdelivr.net/pyodide/v314.0.2/full/pyodide.mjs";
 
+const PYTHON_SOURCE_URL = "https://raw.githubusercontent.com/KAFKA2306/nk225seasonality/39b98e6a77e50715e469d57a21d2a8c6f8aa484e/src/analysis/browser_scenario.py";
 let runtimePromise;
 
 async function getRuntime() {
@@ -7,8 +8,8 @@ async function getRuntime() {
     const started = performance.now();
     runtimePromise = (async () => {
       const pyodide = await loadPyodide();
-      const pythonSource = await fetch("./browser_scenario.py").then((response) => {
-        if (!response.ok) throw new Error(`python source unavailable: ${response.status}`);
+      const pythonSource = await fetch(PYTHON_SOURCE_URL).then((response) => {
+        if (!response.ok) throw new Error(`pinned python source unavailable: ${response.status}`);
         return response.text();
       });
       pyodide.FS.writeFile("/browser_scenario.py", pythonSource);
