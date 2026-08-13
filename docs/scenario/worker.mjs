@@ -7,7 +7,7 @@ async function getRuntime() {
     const started = performance.now();
     runtimePromise = (async () => {
       const pyodide = await loadPyodide();
-      const pythonSource = await fetch("../../src/analysis/browser_scenario.py").then((response) => {
+      const pythonSource = await fetch("./browser_scenario.py").then((response) => {
         if (!response.ok) throw new Error(`python source unavailable: ${response.status}`);
         return response.text();
       });
