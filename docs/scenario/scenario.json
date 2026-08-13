@@ -1,0 +1,10 @@
+{
+  "schema_version": "nk225seasonality.browser-scenario.v1",
+  "mode": "user_input_only",
+  "source_snapshot": null,
+  "data_as_of": null,
+  "jgb_observed_at": null,
+  "method": "user_input_current_rate_scenario",
+  "canonical_point_in_time_overwritten": false,
+  "notes": "No market snapshot is implicitly fetched. Values entered here are hypothetical scenario inputs, not canonical point-in-time observations."
+}
