@@ -1,40 +1,44 @@
-# CLAUDE.md
+# Repository guidance
 
-> **AIエージェントおよび開発者向けガイド**
+## Scope
 
-## 🧠 コンテキスト
-**プロジェクト**: 日経225 季節性分析 & バリュエーションシステム (Nikkei 225 Seasonality Analysis & Valuation System)
-**目標**: 厳密な統計的季節性検定と、市場バリュエーションモデル（イールドギャップ/PER）を統合する。
-**技術スタック**: Python 3.12+, `uv` (依存関係管理), `ruff` (linter), `pytest`.
+This repository analyzes Nikkei 225 seasonality and market valuation with Python. Keep historical valuation point-in-time: do not use observations that were unavailable on the evaluated date.
 
-## 🛠️ 開発ワークフロー
-本プロジェクトでは `uv` と `Taskfile` を使用してワークフローを合理化しています。
+## Tooling
 
-### 主要コマンド
-- **環境セットアップ**: `task setup` (または `uv sync`)
-- **テスト実行**: `task test` (または `uv run pytest`)
-- **Lint/フォーマット**: `task validate` (または `uv run ruff check .`)
-- **バリュエーション分析**: `task valuation`
-- **時系列バリュエーション**: `task valuation-ts YEARS=5 YIELD=3.5`
-- **季節性分析**: `uv run python main.py seasonality --years 5`
+- Python: 3.10+
+- Dependency management: `uv`
+- Lint/format: Ruff
+- Tests: pytest
+- Task runner: Task
 
-## 🏗️ アーキテクチャ
-- **Root**: 最小限の設定ファイルのみ配置 (`pyproject.toml`, `Taskfile.yml`, `main.py`)。
-- **Src**: 全てのロジックは `src/` 配下に配置。
-    - `src/analysis/valuation.py`: イールドギャップ/適正PERのコアロジック。
-    - `src/analysis/seasonality.py`: 市場パターンの統計的検定。
-- **Data**: 入出力データは `data/` および `outputs/` に配置。
+## Commands
 
-## 📝 コーディングガイドライン
-1. **ルートディレクトリの最小化**: ルートにファイルを追加しないこと。クリーンに保つ。
-2. **型安全性**: 全ての関数シグネチャで `typing` (List, Dict, Optional 等) を使用する。
-3. **クリーンコード**: 未使用のインポート、デッドコード、冗長なコメントを削除する。
-4. **エラーハンドリング**: CLIのエントリーポイントでは `try/except` ブロックを使用し、ユーザーフレンドリーなエラーを表示する。
+```bash
+uv sync
+uv run pytest
+uv run ruff check .
+task format
+task seasonality YEARS=5
+task valuation-ts YEARS=5 PREMIUM=3.5
+uv run python main.py valuation --current-per 19.75
+```
 
-## 🚀 最近の変更点
-- **コードベースのクリーンアップ**: 全てのPythonファイルから冗長なコメントとdocstringを削除し、可読性を向上。
-- **検証プロセスの強化**: `scripts/generate_report.py` の修正と `task validate` による厳格なチェックを通過。
-- **ドキュメントの最適化**: `README.md` にステータスバッジを追加し、アーキテクチャ図を更新。
-- **時系列バリュエーション分析** (`valuation-ts`) を追加: 過去の月次PER推移と乖離率を表示。
-- `ingestion.py` に yfinance インポートを追加。
-- "バリュエーションダッシュボード" (イールドギャップ分析) を統合。
+`Taskfile.yml`, `pyproject.toml`, and `main.py` are the authority for available commands. Do not document a task that is not defined there.
+
+## Structure
+
+- `main.py`: CLI entry point
+- `src/`: analysis, data, risk, options, and visualization code
+- `tests/`: regression tests
+- `scripts/`: report generation
+- `docs/`: generated/public Pages content
+- `data/`: analysis inputs and outputs tracked by the repository
+
+## Changes
+
+- Prefer deleting or consolidating unused code, configuration, and documentation over adding alternatives.
+- Do not duplicate calculation logic between CLI, reports, and browser-facing code.
+- Keep public behavior, tests, and the Pages deployment path working when simplifying.
+- Use plain language and established Python, GitHub Actions, and financial terminology.
+- Run only the checks relevant to the change and report unexecuted checks as unverified.
