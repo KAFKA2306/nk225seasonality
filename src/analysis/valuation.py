@@ -2,11 +2,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
 import numpy as np
 import pandas as pd
 import yfinance as yf
+
+from ..data.snapshots import build_snapshot_manifest, write_immutable_snapshot
 
 
 @dataclass
@@ -106,12 +109,70 @@ def _utc_naive(values: Any) -> pd.DatetimeIndex:
     return index
 
 
-def fetch_nikkei_data(years: int) -> pd.DataFrame:
+def _persist_market_snapshot(
+    frame: pd.DataFrame,
+    *,
+    value_column: str,
+    snapshot_directory: Path,
+    provider: str,
+    identifier: str,
+    meaning: str,
+    unit: str,
+    requested_start: datetime,
+    requested_end: datetime,
+    source_url: str,
+    code_commit_sha: str | None,
+) -> None:
+    manifest = build_snapshot_manifest(
+        frame,
+        value_columns=[value_column],
+        provider=provider,
+        identifier=identifier,
+        meaning=meaning,
+        unit=unit,
+        observation_timezone="UTC-normalized from provider timestamps",
+        requested_start=requested_start,
+        requested_end=requested_end,
+        source_url=source_url,
+        code_commit_sha=code_commit_sha,
+    )
+    write_immutable_snapshot(
+        snapshot_directory,
+        frame,
+        manifest,
+        value_columns=[value_column],
+    )
+
+
+def fetch_nikkei_data(
+    years: int,
+    *,
+    snapshot_directory: Path | None = None,
+    code_commit_sha: str | None = None,
+) -> pd.DataFrame:
     end = datetime.now()
     start = end - timedelta(days=years * 365)
     frame = yf.Ticker("^N225").history(start=start, end=end, interval="1mo")
-    if frame.empty:
+    if frame.empty or "Close" not in frame:
         raise RuntimeError("Failed to fetch Nikkei 225 data")
+    if snapshot_directory is not None:
+        snapshot = pd.DataFrame(
+            {"close": pd.to_numeric(frame["Close"], errors="coerce")},
+            index=_utc_naive(frame.index),
+        ).dropna()
+        _persist_market_snapshot(
+            snapshot,
+            value_column="close",
+            snapshot_directory=snapshot_directory,
+            provider="Yahoo Finance via yfinance",
+            identifier="^N225",
+            meaning="Nikkei Stock Average index level",
+            unit="index points",
+            requested_start=start,
+            requested_end=end,
+            source_url="https://finance.yahoo.com/quote/%5EN225/history/",
+            code_commit_sha=code_commit_sha,
+        )
     return frame
 
 
@@ -133,6 +194,9 @@ def fetch_jgb_yield_history(
     ticker: str,
     start: datetime | pd.Timestamp,
     end: datetime | pd.Timestamp,
+    *,
+    snapshot_directory: Path | None = None,
+    code_commit_sha: str | None = None,
 ) -> pd.DataFrame:
     """Fetch dated JGB observations for point-in-time valuation.
 
@@ -159,6 +223,20 @@ def fetch_jgb_yield_history(
         raise RuntimeError(f"Historical JGB data is empty after validation for ticker {ticker}")
     if not result["jgb_yield"].between(-1.0, 10.0).all():
         raise RuntimeError(f"Historical JGB data contains values outside the accepted range for {ticker}")
+    if snapshot_directory is not None:
+        _persist_market_snapshot(
+            result,
+            value_column="jgb_yield",
+            snapshot_directory=snapshot_directory,
+            provider="Yahoo Finance via yfinance",
+            identifier=ticker,
+            meaning="10-year JGB yield series used by the valuation model",
+            unit="percentage points",
+            requested_start=start_timestamp.to_pydatetime(),
+            requested_end=end_timestamp.to_pydatetime(),
+            source_url=f"https://finance.yahoo.com/quote/{ticker}/history/",
+            code_commit_sha=code_commit_sha,
+        )
     return result
 
 
@@ -250,13 +328,17 @@ def run_time_series_report(years: int) -> None:
 
     config = SystemConfig()
     risk_premium = config.valuation.risk_premium
+    snapshot_root = config.data_dir / "market_snapshots"
 
     print("\n" + "=" * 60)
     print("TIME SERIES VALUATION ANALYSIS (POINT-IN-TIME JGB)")
     print("=" * 60)
     print(f"\nFetching {years} years of Nikkei 225 and JGB data...")
 
-    price_data = fetch_nikkei_data(years)
+    price_data = fetch_nikkei_data(
+        years,
+        snapshot_directory=snapshot_root / "nikkei225",
+    )
     per_frame = calculate_historical_per(
         price_data,
         eps_provider=config.valuation.get_eps_for_date,
@@ -265,6 +347,7 @@ def run_time_series_report(years: int) -> None:
         config.valuation.jgb_ticker,
         per_frame.index.min(),
         per_frame.index.max(),
+        snapshot_directory=snapshot_root / "jgb10y",
     )
     current_yield = fetch_current_jgb_yield(config.valuation.jgb_ticker)
     results = apply_point_in_time_valuation(
