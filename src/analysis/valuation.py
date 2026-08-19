@@ -157,7 +157,7 @@ def fetch_nikkei_data(
         raise RuntimeError("Failed to fetch Nikkei 225 data")
     if snapshot_directory is not None:
         snapshot = pd.DataFrame(
-            {"close": pd.to_numeric(frame["Close"], errors="coerce")},
+            {"close": pd.to_numeric(frame["Close"], errors="coerce").to_numpy()},
             index=_utc_naive(frame.index),
         ).dropna()
         _persist_market_snapshot(
@@ -214,7 +214,7 @@ def fetch_jgb_yield_history(
     if history.empty or "Close" not in history:
         raise RuntimeError(f"No historical JGB data returned for ticker {ticker}")
     result = pd.DataFrame(
-        {"jgb_yield": pd.to_numeric(history["Close"], errors="coerce")},
+        {"jgb_yield": pd.to_numeric(history["Close"], errors="coerce").to_numpy()},
         index=_utc_naive(history.index),
     )
     result.index.name = "jgb_observed_at"
