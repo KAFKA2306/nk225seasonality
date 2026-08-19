@@ -5,6 +5,7 @@ import pytest
 
 from src.data.snapshots import (
     build_snapshot_manifest,
+    build_snapshot_revision_report,
     canonical_csv_bytes,
     write_immutable_snapshot,
 )
@@ -54,6 +55,56 @@ def test_manifest_records_provenance_and_observation_range():
     assert manifest["max_observation"] == "2026-08-19T06:00:00Z"
     assert len(manifest["sha256"]) == 64
     assert manifest["code_commit_sha"] == "abc123"
+
+
+def test_snapshot_revision_report_identifies_one_revised_observation():
+    previous = _frame()
+    current = _frame().copy()
+    current.loc[pd.Timestamp("2026-08-19T06:00:00Z"), "close"] = 39130.25
+
+    report = build_snapshot_revision_report(previous, current, value_columns=["close"])
+
+    assert report["previous_sha256"] == _manifest(previous)["sha256"]
+    assert report["current_sha256"] == _manifest(current)["sha256"]
+    assert report["previous_sha256"] != report["current_sha256"]
+    assert report["change_count"] == 1
+    assert report["changes"] == [
+        {
+            "observed_at": "2026-08-19T06:00:00Z",
+            "column": "close",
+            "change_type": "changed",
+            "old_value": 39125.5,
+            "new_value": 39130.25,
+        }
+    ]
+
+
+def test_snapshot_revision_report_tracks_added_and_removed_observations():
+    previous = _frame()
+    current = pd.DataFrame(
+        {"close": [39125.5, 39200.0]},
+        index=pd.to_datetime(["2026-08-19T06:00:00Z", "2026-08-20T06:00:00Z"]),
+    )
+
+    report = build_snapshot_revision_report(previous, current, value_columns=["close"])
+
+    assert report["change_count"] == 2
+    assert report["changes"] == [
+        {
+            "observed_at": "2026-08-18T06:00:00Z",
+            "column": "close",
+            "change_type": "removed",
+            "old_value": 39000.0,
+            "new_value": None,
+        },
+        {
+            "observed_at": "2026-08-20T06:00:00Z",
+            "column": "close",
+            "change_type": "added",
+            "old_value": None,
+            "new_value": 39200.0,
+        },
+    ]
 
 
 def test_snapshot_rejects_duplicate_observation_times():
