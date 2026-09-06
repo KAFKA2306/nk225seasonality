@@ -38,7 +38,7 @@ jobs:
       - name: Run valuation analysis
         run: |
           mkdir -p docs
-          uv run python scripts/generate_report.py > docs/index.html
+          uv run python scripts/generate_report.py
       
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
