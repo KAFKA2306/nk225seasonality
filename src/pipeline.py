@@ -176,10 +176,14 @@ class AnalysisPipeline:
                 data,
                 save_path="seasonality/heatmap_year_month.png",
             )
-            self.seasonality_viz.create_valuation_chart(
-                data,
-                save_path="seasonality/valuation_timeseries.png",
-            )
+
+            valuation_chart = None
+            if pipeline_results["metadata"]["valuation_evidence"]["method"] == "historical_point_in_time_jgb_asof":
+                self.seasonality_viz.create_valuation_chart(
+                    data,
+                    save_path="seasonality/valuation_timeseries.png",
+                )
+                valuation_chart = "seasonality/valuation_timeseries.png"
 
             pipeline_results["visualization"] = {
                 "seasonality_returns_chart": "seasonality/barchart_returns.png",
@@ -187,7 +191,7 @@ class AnalysisPipeline:
                 "timeseries_plot": "seasonality/timeseries_seasonality.png",
                 "boxplot_distribution": "seasonality/boxplot_distribution.png",
                 "heatmap_year_month": "seasonality/heatmap_year_month.png",
-                "valuation_timeseries": "seasonality/valuation_timeseries.png",
+                "valuation_timeseries": valuation_chart,
             }
 
         pipeline_results["summary"] = {
