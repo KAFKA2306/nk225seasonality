@@ -64,30 +64,48 @@ class AnalysisPipeline:
             dtype="float64",
         )
 
-        jgb_history = fetch_jgb_yield_history(
-            valuation_config.jgb_ticker,
-            raw_data.index.min(),
-            raw_data.index.max(),
-        )
-        current_jgb_yield = fetch_current_jgb_yield(valuation_config.jgb_ticker)
-        raw_data = apply_point_in_time_valuation(
-            raw_data,
-            jgb_history,
-            risk_premium=valuation_config.risk_premium,
-            per_column="per",
-            current_jgb_yield=current_jgb_yield,
-        )
-
-        pipeline_results["metadata"]["valuation_evidence"] = {
-            "method": "historical_point_in_time_jgb_asof",
-            "jgb_ticker": valuation_config.jgb_ticker,
-            "risk_premium": valuation_config.risk_premium,
-            "yield_observation_count": len(jgb_history),
-            "first_yield_observation": jgb_history.index.min(),
-            "last_yield_observation": jgb_history.index.max(),
-            "missing_point_in_time_yield_rows": int(raw_data["jgb_yield"].isna().sum()),
-            "current_rate_revaluation_jgb_yield": current_jgb_yield,
-        }
+        try:
+            jgb_history = fetch_jgb_yield_history(
+                valuation_config.jgb_ticker,
+                raw_data.index.min(),
+                raw_data.index.max(),
+            )
+            current_jgb_yield = fetch_current_jgb_yield(valuation_config.jgb_ticker)
+            raw_data = apply_point_in_time_valuation(
+                raw_data,
+                jgb_history,
+                risk_premium=valuation_config.risk_premium,
+                per_column="per",
+                current_jgb_yield=current_jgb_yield,
+            )
+            pipeline_results["metadata"]["valuation_evidence"] = {
+                "method": "historical_point_in_time_jgb_asof",
+                "jgb_ticker": valuation_config.jgb_ticker,
+                "risk_premium": valuation_config.risk_premium,
+                "yield_observation_count": len(jgb_history),
+                "first_yield_observation": jgb_history.index.min(),
+                "last_yield_observation": jgb_history.index.max(),
+                "missing_point_in_time_yield_rows": int(raw_data["jgb_yield"].isna().sum()),
+                "current_rate_revaluation_jgb_yield": current_jgb_yield,
+            }
+        except RuntimeError as exc:
+            raw_data["jgb_yield"] = pd.NA
+            raw_data["jgb_observed_at"] = pd.NaT
+            raw_data["fair_per"] = pd.NA
+            raw_data["divergence"] = pd.NA
+            raw_data["valuation_status"] = "Unavailable"
+            raw_data["valuation_method"] = "unavailable_missing_jgb_evidence"
+            raw_data["current_jgb_yield"] = pd.NA
+            raw_data["current_rate_fair_per"] = pd.NA
+            raw_data["current_rate_divergence"] = pd.NA
+            raw_data["current_rate_valuation_status"] = "Unavailable"
+            pipeline_results["metadata"]["valuation_evidence"] = {
+                "method": "unavailable_missing_jgb_evidence",
+                "jgb_ticker": valuation_config.jgb_ticker,
+                "risk_premium": valuation_config.risk_premium,
+                "error": str(exc),
+                "yield_observation_count": 0,
+            }
 
         if not skip_storage:
             self.data_repository.store_data(raw_data, "pipeline_analysis")
