@@ -143,25 +143,32 @@ async def generate_report():
         else:
             sig_months_str = "<span style='color:#94a3b8'>None detected (10y)</span>"
 
+        valuation_chart_path = viz.get("valuation_timeseries")
+        valuation_visual_html = ""
+        if valuation_chart_path:
+            valuation_visual_html = f"""
+            <div class="chart-full">
+                <h3>1. Valuation Model & Deviation (Yield Gap)</h3>
+                <img src="{valuation_chart_path}" alt="Valuation Time Series" loading="lazy">
+                <p class="l" style="margin-top: 1rem; text-align: left;">
+                    <strong>Methodology:</strong> Historical valuation uses the latest 10-year JGB observation available on or before each market observation date plus the configured risk premium. Future JGB observations are never backfilled into older rows.
+                </p>
+            </div>
+            """
+
         seasonality_html = f"""
         <div class="section">
-            <h2>🌸 Advanced Seasonality & Valuation Analysis</h2>
+            <h2>🌸 Advanced Seasonality Analysis</h2>
 
             <div class="m" style="text-align:left; margin-bottom: 2rem; display: flex; align-items: center; gap: 1rem;">
                 <span class="l">Significant Months (10y):</span>
                 <div>{sig_months_str}</div>
             </div>
 
-            <div class="chart-full">
-                <h3>1. Valuation Model & Deviation (Yield Gap)</h3>
-                <img src="{viz.get('valuation_timeseries', '')}" alt="Valuation Time Series" loading="lazy">
-                <p class="l" style="margin-top: 1rem; text-align: left;">
-                    <strong>Methodology:</strong> Historical valuation uses the latest 10-year JGB observation available on or before each market observation date plus the configured risk premium. Future JGB observations are never backfilled into older rows.
-                </p>
-            </div>
+            {valuation_visual_html}
 
             <div class="chart-full">
-                <h3>2. Seasonal Stability Matrix (Year x Month)</h3>
+                <h3>Seasonal Stability Matrix (Year x Month)</h3>
                 <img src="{viz.get('heatmap_year_month', '')}" alt="Year-Month Heatmap" loading="lazy">
                 <p class="l" style="margin-top: 1rem; text-align: left;">
                     <strong>Insight:</strong> Detailed breakdown of monthly returns by year. Helps identify whether a seasonal pattern is consistent over time or driven by outliers.
@@ -169,7 +176,7 @@ async def generate_report():
             </div>
 
             <div class="chart-full">
-                <h3>3. Monthly Return Distributions</h3>
+                <h3>Monthly Return Distributions</h3>
                 <img src="{viz.get('boxplot_distribution', '')}" alt="Monthly Boxplots" loading="lazy">
                 <p class="l" style="margin-top: 1rem; text-align: left;">
                     <strong>Statistical Robustness:</strong> Boxplots show the median, interquartile range (IQR), and outliers for each month. Narrow boxes indicate consistent behavior; wide boxes indicate high volatility.
@@ -188,7 +195,7 @@ async def generate_report():
             </div>
 
             <div class="chart-full">
-                <h3>5. Cumulative Seasonality Trend</h3>
+                <h3>Cumulative Seasonality Trend</h3>
                 <img src="{viz.get('timeseries_plot', '')}" alt="Seasonality Time Series" loading="lazy">
                 <p class="l" style="margin-top: 1rem; text-align: left;">
                     <strong>Test Specification:</strong> Seasonality evaluated via One-Sample T-test (Null: Mean=0). Significance threshold p &lt; 0.05 (Bonferroni corrected).
