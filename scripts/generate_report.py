@@ -23,6 +23,12 @@ def _format_observed_at(value) -> str:
     return pd.Timestamp(value).strftime("%Y-%m-%d")
 
 
+def _format_multiple(value, suffix: str) -> str:
+    if pd.isna(value):
+        return "Unavailable"
+    return f"{float(value):.1f}{suffix}"
+
+
 def _status_color(status: str) -> str:
     if "Under" in status:
         return "#22c55e"
@@ -31,6 +37,17 @@ def _status_color(status: str) -> str:
     if status == "Unavailable":
         return "#94a3b8"
     return "#eab308"
+
+
+def _valuation_unavailable(per_frame: pd.DataFrame) -> pd.DataFrame:
+    output = per_frame.copy()
+    output["jgb_yield"] = pd.NA
+    output["jgb_observed_at"] = pd.NaT
+    output["fair_per"] = pd.NA
+    output["divergence"] = pd.NA
+    output["valuation_status"] = "Unavailable"
+    output["valuation_method"] = "unavailable_missing_jgb_evidence"
+    return output
 
 
 async def generate_report():
@@ -46,25 +63,34 @@ async def generate_report():
         price_data,
         eps_provider=config.valuation.get_eps_for_date,
     )
-    jgb_history = fetch_jgb_yield_history(
-        config.valuation.jgb_ticker,
-        per_frame.index.min(),
-        per_frame.index.max(),
-    )
-    valuation = apply_point_in_time_valuation(
-        per_frame,
-        jgb_history,
-        risk_premium=premium,
-        per_column="estimated_per",
-    )
+
+    valuation_error = None
+    try:
+        jgb_history = fetch_jgb_yield_history(
+            config.valuation.jgb_ticker,
+            per_frame.index.min(),
+            per_frame.index.max(),
+        )
+        valuation = apply_point_in_time_valuation(
+            per_frame,
+            jgb_history,
+            risk_premium=premium,
+            per_column="estimated_per",
+        )
+    except RuntimeError as exc:
+        valuation_error = str(exc)
+        print(f"Valuation evidence unavailable: {valuation_error}")
+        valuation = _valuation_unavailable(per_frame)
 
     valuation_rows = []
     for date, row in valuation.iloc[::-1].iterrows():
         status = str(row["valuation_status"])
         color = _status_color(status)
         observed_at = _format_observed_at(row["jgb_observed_at"])
-        fair_per = "Unavailable" if pd.isna(row["fair_per"]) else f"{row['fair_per']:.1f}x"
-        divergence = "Unavailable" if pd.isna(row["divergence"]) else f"{row['divergence']:+.1f}%"
+        fair_per = _format_multiple(row["fair_per"], "x")
+        divergence = _format_multiple(row["divergence"], "%")
+        if divergence != "Unavailable" and float(row["divergence"]) >= 0:
+            divergence = f"+{divergence}"
         valuation_rows.append(
             f"<tr><td>{date.strftime('%Y-%m')}</td><td>{row['price']:,.0f}</td>"
             f"<td>{row['estimated_per']:.1f}x</td><td>{observed_at}</td><td>{fair_per}</td>"
@@ -75,15 +101,26 @@ async def generate_report():
     cur_date = pd.Timestamp(cur.name)
     cur_observed_at = _format_observed_at(cur["jgb_observed_at"])
     cur_per = float(cur["estimated_per"])
-    cur_fair_per = float(cur["fair_per"])
-    cur_div = float(cur["divergence"])
+    cur_fair_per = _format_multiple(cur["fair_per"], "x")
+    cur_div = _format_multiple(cur["divergence"], "%")
+    if cur_div != "Unavailable" and float(cur["divergence"]) >= 0:
+        cur_div = f"+{cur_div}"
+
     observation_age_days = (datetime.now().date() - cur_date.date()).days
-    evidence_state = "CURRENT SNAPSHOT" if observation_age_days <= 45 else "HISTORICAL SNAPSHOT — VERIFY FIRST"
-    evidence_detail = (
-        "Latest market observation is recent enough for this generated report."
-        if observation_age_days <= 45
-        else f"Latest market observation is {observation_age_days} days old. Do not treat this as a current market signal."
-    )
+    if valuation_error:
+        evidence_state = "VALUATION EVIDENCE UNAVAILABLE"
+        evidence_detail = (
+            "10-year JGB evidence could not be retrieved, so fair PER, divergence, and valuation status are unavailable. "
+            "No stale yield is substituted."
+        )
+    elif observation_age_days > 45:
+        evidence_state = "HISTORICAL SNAPSHOT — VERIFY FIRST"
+        evidence_detail = (
+            f"Latest market observation is {observation_age_days} days old. Do not treat this as a current market signal."
+        )
+    else:
+        evidence_state = "CURRENT SNAPSHOT"
+        evidence_detail = "Latest market observation is recent enough for this generated report."
 
     print("Running Seasonality Analysis...")
     config.output_dir = Path("docs")
@@ -234,8 +271,8 @@ async def generate_report():
         <div class="g">
             <div class="m"><div class="v">{cur['price']:,.0f}</div><div class="l">Latest observed price</div></div>
             <div class="m"><div class="v">{cur_per:.1f}x</div><div class="l">Observed PER</div></div>
-            <div class="m"><div class="v">{cur_fair_per:.1f}x</div><div class="l">Point-in-time fair PER</div></div>
-            <div class="m"><div class="v {'o' if cur_div > 0 else 'u'}">{cur_div:+.1f}%</div><div class="l">Point-in-time divergence</div></div>
+            <div class="m"><div class="v">{cur_fair_per}</div><div class="l">Point-in-time fair PER</div></div>
+            <div class="m"><div class="v">{cur_div}</div><div class="l">Point-in-time divergence</div></div>
         </div>
         <div class="table-container">
             <table>
