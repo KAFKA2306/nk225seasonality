@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from typing import Any, Dict, Optional
 
@@ -49,6 +50,23 @@ class AnalysisPipeline:
 
         raw_data = await self.data_ingestion.collect_data(start_date, end_date)
         validation_results = self.data_validator.validate_dataset(raw_data)
+        if not validation_results.is_valid:
+            failure = {
+                "code": "DATA_VALIDATION_FAILED",
+                "summary": validation_results.summary,
+                "issues": [
+                    {
+                        "severity": issue.severity.value,
+                        "rule_name": issue.rule_name,
+                        "description": issue.description,
+                        "affected_dates": [date.isoformat() for date in issue.affected_dates],
+                        "details": issue.details,
+                    }
+                    for issue in validation_results.issues
+                    if issue.severity.value in {"error", "critical"}
+                ],
+            }
+            raise RuntimeError(json.dumps(failure, default=str, sort_keys=True))
 
         if "returns" not in raw_data.columns:
             raw_data["returns"] = raw_data.get(
