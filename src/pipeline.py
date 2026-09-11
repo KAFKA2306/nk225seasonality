@@ -16,6 +16,24 @@ from .risk import MonteCarloEngine, VaRCalculator
 from .visualization import OptionsVisualizer, RiskVisualizer, SeasonalityVisualizer
 
 
+class DataValidationError(ValueError):
+    """Raised when collected market data fails the canonical validation gate."""
+
+    def __init__(self, validation_result):
+        self.validation_result = validation_result
+        failed_rules = sorted(
+            {
+                issue.rule_name
+                for issue in validation_result.issues
+                if issue.severity.value in {"error", "critical"}
+            }
+        )
+        super().__init__(
+            "Market data validation failed"
+            + (f": {', '.join(failed_rules)}" if failed_rules else "")
+        )
+
+
 class AnalysisPipeline:
     def __init__(self, config: Optional[SystemConfig] = None):
         self.config = config or SystemConfig()
@@ -49,6 +67,8 @@ class AnalysisPipeline:
 
         raw_data = await self.data_ingestion.collect_data(start_date, end_date)
         validation_results = self.data_validator.validate_dataset(raw_data)
+        if not validation_results.is_valid:
+            raise DataValidationError(validation_results)
 
         if "returns" not in raw_data.columns:
             raw_data["returns"] = raw_data.get(
