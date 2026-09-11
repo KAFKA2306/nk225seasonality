@@ -50,6 +50,29 @@ class AnalysisPipeline:
         raw_data = await self.data_ingestion.collect_data(start_date, end_date)
         validation_results = self.data_validator.validate_dataset(raw_data)
 
+        if not validation_results.is_valid:
+            blocking_issues = [
+                {
+                    "severity": issue.severity.value,
+                    "rule_name": issue.rule_name,
+                    "description": issue.description,
+                    "details": issue.details,
+                }
+                for issue in validation_results.issues
+                if issue.severity.value in {"error", "critical"}
+            ]
+            pipeline_results["data_phase"] = {
+                "success": False,
+                "validated_data": raw_data,
+                "data_quality_valid": False,
+                "validation_failure": {
+                    "reason": "data_validation_failed",
+                    "blocking_issues": blocking_issues,
+                },
+            }
+            pipeline_results["success"] = False
+            return pipeline_results
+
         if "returns" not in raw_data.columns:
             raw_data["returns"] = raw_data.get(
                 "adjusted_close",
