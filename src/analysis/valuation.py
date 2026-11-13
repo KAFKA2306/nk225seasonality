@@ -284,6 +284,8 @@ def apply_point_in_time_valuation(
     ).sort_values("valuation_date")
     right = jgb_history[["jgb_yield"]].copy()
     right.index = _utc_naive(right.index)
+    if right.index.hasnans or not right.index.is_unique:
+        raise ValueError("JGB observation timestamps must be present and unique")
     right = right.sort_index().reset_index()
     observed_column = right.columns[0]
     right = right.rename(columns={observed_column: "jgb_observed_at"})
