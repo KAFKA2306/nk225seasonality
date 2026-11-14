@@ -186,6 +186,13 @@ class SeasonalityAnalyzer:
 
         total_windows = len(rolling_results)
         consistency_threshold = 0.6
+        if total_windows == 0:
+            return {
+                "total_windows": 0,
+                "month_significance_frequency": {month: None for month in range(1, 13)},
+                "consistent_months": {},
+                "consistency_threshold": consistency_threshold,
+            }
 
         consistent_months = {
             month: count / total_windows
